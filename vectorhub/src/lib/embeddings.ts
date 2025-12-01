@@ -2,6 +2,11 @@ import fs from 'fs';
 import path from 'path';
 
 export async function generateEmbedding(text: string): Promise<number[]> {
+    const cleanedText = text.replace(/\n/g, " ").trim();
+    if (!cleanedText) {
+        throw new Error("Input text cannot be empty or whitespace only");
+    }
+
     let apiKey = process.env.OPENAI_API_KEY;
 
     // Fallback: Try to read .env manually if not found in process.env
@@ -33,7 +38,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
             },
             body: JSON.stringify({
                 model: "text-embedding-3-small",
-                input: text.replace(/\n/g, " "),
+                input: cleanedText,
             }),
         });
 

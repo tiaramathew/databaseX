@@ -157,7 +157,7 @@ export async function POST(request: Request) {
                     query.topK || 10,
                     query.minScore || 0.5
                 );
-            } else if (query.text) {
+            } else if (query.text && query.text.trim()) {
                 // Generate embedding for text query if vector is not provided
                 try {
                     const vector = await generateEmbedding(query.text);
