@@ -156,7 +156,7 @@ export default function UploadPage() {
         if (!selectedConnection) return;
         const connection = connections.find((c) => c.id === selectedConnection);
         if (!connection) return;
-        
+
         try {
             const latest = await listCollectionsApi(connection);
             setCollections(latest);
@@ -235,8 +235,10 @@ export default function UploadPage() {
 
             try {
                 const connection = connections.find((c) => c.id === selectedConnection);
-                await addDocumentsApi(selectedCollection, docs, connection);
-                docs.forEach((doc) => addDocument(doc));
+                const returnedIds = await addDocumentsApi(selectedCollection, docs, connection);
+                docs.forEach((doc, index) => {
+                    addDocument({ ...doc, id: returnedIds[index] || doc.id });
+                });
                 await syncCollectionsFromDb();
 
                 await syncToExternalConnections(docs, selectedCollection);
@@ -287,8 +289,8 @@ export default function UploadPage() {
 
             try {
                 const connection = connections.find((c) => c.id === selectedConnection);
-                await addDocumentsApi(selectedCollection, [doc], connection);
-                addDocument(doc);
+                const returnedIds = await addDocumentsApi(selectedCollection, [doc], connection);
+                addDocument({ ...doc, id: returnedIds[0] || doc.id });
                 await syncCollectionsFromDb();
 
                 await syncToExternalConnections([doc], selectedCollection);
@@ -342,8 +344,10 @@ export default function UploadPage() {
 
             try {
                 const connection = connections.find((c) => c.id === selectedConnection);
-                await addDocumentsApi(selectedCollection, docs, connection);
-                docs.forEach((doc) => addDocument(doc));
+                const returnedIds = await addDocumentsApi(selectedCollection, docs, connection);
+                docs.forEach((doc, index) => {
+                    addDocument({ ...doc, id: returnedIds[index] || doc.id });
+                });
                 await syncCollectionsFromDb();
 
                 await syncToExternalConnections(docs, selectedCollection);

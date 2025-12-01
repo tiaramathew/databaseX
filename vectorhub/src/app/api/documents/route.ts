@@ -36,7 +36,7 @@ async function addMongoDBDocuments(
         const col = db.collection(collection);
 
         const docs = documents.map((doc) => ({
-            _id: doc.id ? new ObjectId(doc.id) : new ObjectId(),
+            _id: doc.id && ObjectId.isValid(doc.id) ? new ObjectId(doc.id) : new ObjectId(),
             content: doc.content,
             embedding: doc.embedding,
             metadata: doc.metadata || {},
@@ -73,7 +73,7 @@ async function deleteMongoDBDocuments(
 
         const result = await col.deleteMany({
             $or: [
-                { _id: { $in: objectIds } },
+                { _id: { $in: objectIds as any[] } },
                 { id: { $in: ids } },
             ],
         });
