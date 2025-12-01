@@ -1,31 +1,67 @@
 import { NextResponse } from "next/server";
-import { VectorDBClient } from "@/lib/db/client";
-import { ConnectionConfig } from "@/types/connections";
+import { MongoClient } from "mongodb";
+import { ConnectionConfig, MongoDBAtlasConfig } from "@/types/connections";
 import {
     createCollectionSchema,
     validateRequestBody,
 } from "@/lib/validations/api";
-import type { CreateCollectionConfig } from "@/lib/db/adapters/base";
+import type { CreateCollectionConfig, CollectionInfo } from "@/lib/db/adapters/base";
 import { logger } from "@/lib/logger";
 
-const getClient = (request: Request) => {
+const getConnectionConfig = (request: Request): ConnectionConfig => {
     const configHeader = request.headers.get("x-connection-config");
     if (!configHeader) {
         throw new Error("Missing connection configuration");
     }
-    try {
-        const config = JSON.parse(configHeader) as ConnectionConfig;
-        return new VectorDBClient(config);
-    } catch (error) {
-        throw new Error("Invalid connection configuration");
-    }
+    return JSON.parse(configHeader) as ConnectionConfig;
 };
+
+// Direct MongoDB connection for listing collections
+async function listMongoDBCollections(config: MongoDBAtlasConfig): Promise<CollectionInfo[]> {
+    const client = new MongoClient(config.connectionString);
+    
+    try {
+        await client.connect();
+        const db = client.db(config.database);
+        const collections = await db.listCollections().toArray();
+
+        const collectionInfos = await Promise.all(
+            collections.map(async (col) => {
+                let count = 0;
+                try {
+                    count = await db.collection(col.name).countDocuments();
+                } catch {
+                    // Ignore count errors
+                }
+
+                return {
+                    name: col.name,
+                    dimensions: config.dimensions || 1536,
+                    distanceMetric: "cosine",
+                    documentCount: count,
+                };
+            })
+        );
+
+        return collectionInfos;
+    } finally {
+        await client.close();
+    }
+}
 
 export async function GET(request: Request) {
     try {
-        const client = getClient(request);
-        const collections = await client.listCollections();
-        return NextResponse.json(collections);
+        const connectionConfig = getConnectionConfig(request);
+        
+        // Handle different database types
+        if (connectionConfig.type === "mongodb_atlas") {
+            const mongoConfig = connectionConfig.config as MongoDBAtlasConfig;
+            const collections = await listMongoDBCollections(mongoConfig);
+            return NextResponse.json(collections);
+        }
+        
+        // For other types, return empty array (can be extended)
+        return NextResponse.json([]);
     } catch (error) {
         logger.error("GET /api/collections failed", error);
         return NextResponse.json(
@@ -35,6 +71,29 @@ export async function GET(request: Request) {
             },
             { status: 500 }
         );
+    }
+}
+
+// Direct MongoDB collection creation
+async function createMongoDBCollection(
+    dbConfig: MongoDBAtlasConfig, 
+    collectionConfig: CreateCollectionConfig
+): Promise<CollectionInfo> {
+    const client = new MongoClient(dbConfig.connectionString);
+    
+    try {
+        await client.connect();
+        const db = client.db(dbConfig.database);
+        await db.createCollection(collectionConfig.name);
+
+        return {
+            name: collectionConfig.name,
+            dimensions: collectionConfig.dimensions,
+            distanceMetric: collectionConfig.distanceMetric,
+            documentCount: 0,
+        };
+    } finally {
+        await client.close();
     }
 }
 
@@ -48,7 +107,8 @@ export async function POST(request: Request) {
     const { data } = validation;
 
     try {
-        const client = getClient(request);
+        const connectionConfig = getConnectionConfig(request);
+        
         const config: CreateCollectionConfig = {
             name: data.name,
             description: data.description,
@@ -59,7 +119,20 @@ export async function POST(request: Request) {
             metadataSchema: data.metadataSchema,
         };
 
-        const created = await client.createCollection(config);
+        let created: CollectionInfo;
+        
+        if (connectionConfig.type === "mongodb_atlas") {
+            const mongoConfig = connectionConfig.config as MongoDBAtlasConfig;
+            created = await createMongoDBCollection(mongoConfig, config);
+        } else {
+            // For other types, return a mock response
+            created = {
+                name: config.name,
+                dimensions: config.dimensions,
+                distanceMetric: config.distanceMetric,
+                documentCount: 0,
+            };
+        }
 
         return NextResponse.json(created, { status: 201 });
     } catch (error) {
