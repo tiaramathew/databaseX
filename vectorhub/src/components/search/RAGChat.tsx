@@ -232,7 +232,7 @@ export function RAGChat({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading || disabled) return;
+        if (!input.trim() || isLoading) return;
 
         const userMessage: Message = {
             id: crypto.randomUUID(),
@@ -418,7 +418,6 @@ export function RAGChat({
                                     size="sm"
                                     className="text-xs"
                                     onClick={() => setInput(suggestion)}
-                                    disabled={disabled}
                                 >
                                     {suggestion}
                                 </Button>
@@ -439,15 +438,11 @@ export function RAGChat({
                 <form onSubmit={handleSubmit} className="flex gap-2">
                     <Textarea
                         ref={textareaRef}
-                        placeholder={
-                            disabled
-                                ? "Select a collection first..."
-                                : "Ask a question about your documents..."
-                        }
+                        placeholder="Ask a question..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        disabled={disabled || isLoading}
+                        disabled={isLoading}
                         className="min-h-[44px] max-h-32 resize-none"
                         rows={1}
                     />
@@ -455,7 +450,7 @@ export function RAGChat({
                         type="submit"
                         size="icon"
                         className="h-11 w-11 flex-shrink-0"
-                        disabled={disabled || isLoading || !input.trim()}
+                        disabled={isLoading || !input.trim()}
                     >
                         {isLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />

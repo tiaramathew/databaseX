@@ -109,25 +109,28 @@ export default function SearchPage() {
         }
     }, [collections, selectedCollection]);
 
+    // Get the full connection config for an agent
+    const getAgentConfig = useCallback((agent: AIAgent) => {
+        // Find the connection to get full config
+        const connection = connections.find((c) => c.id === agent.id);
+        if (connection) {
+            return connection.config;
+        }
+        return undefined;
+    }, [connections]);
+
     const handleSendMessage = useCallback(
         async (
             message: string,
             agent: AIAgent | null
         ): Promise<{ response: string; context: SearchResult[] }> => {
-            if (!selectedCollection) {
-                toast.error("No collection selected", {
-                    description: "Please select a collection to search.",
-                });
-                return { response: "Please select a collection first.", context: [] };
-            }
-
             try {
                 const response = await fetch("/api/rag", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         query: message,
-                        collection: selectedCollection,
+                        collection: selectedCollection || undefined,
                         topK: topK[0],
                         minScore: minScore[0],
                         agent: agent
@@ -135,6 +138,7 @@ export default function SearchPage() {
                                   type: agent.type,
                                   endpoint: agent.endpoint,
                                   name: agent.name,
+                                  config: getAgentConfig(agent),
                               }
                             : null,
                     }),
@@ -148,15 +152,15 @@ export default function SearchPage() {
                 const data = await response.json();
                 return {
                     response: data.response,
-                    context: data.context,
+                    context: data.context || [],
                 };
             } catch (error) {
-                const message = error instanceof Error ? error.message : "Unknown error";
-                toast.error("Request failed", { description: message });
-                return { response: `Error: ${message}`, context: [] };
+                const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                toast.error("Request failed", { description: errorMessage });
+                return { response: `Error: ${errorMessage}`, context: [] };
             }
         },
-        [selectedCollection, topK, minScore]
+        [selectedCollection, topK, minScore, getAgentConfig]
     );
 
     const connectedAgentsCount = agents.filter((a) => a.status === "connected").length;
@@ -400,8 +404,8 @@ export default function SearchPage() {
                         agents={agents}
                         selectedAgent={selectedAgent}
                         onSelectAgent={setSelectedAgent}
-                        collectionName={selectedCollection}
-                        disabled={!selectedCollection || collections.length === 0}
+                        collectionName={selectedCollection || "None"}
+                        disabled={false}
                     />
                 </motion.div>
             </div>
