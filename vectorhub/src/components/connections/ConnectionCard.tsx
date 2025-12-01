@@ -13,6 +13,7 @@ interface ConnectionCardProps {
     onDelete: (id: string) => void;
     onEdit: (id: string) => void;
     onSync: (id: string) => void;
+    onViewDetails?: (connection: ConnectionConfig) => void;
     isSyncing?: boolean;
 }
 
@@ -92,12 +93,16 @@ export function ConnectionCard({
     onDelete,
     onEdit,
     onSync,
+    onViewDetails,
     isSyncing = false,
 }: ConnectionCardProps) {
     const status = statusConfig[connection.status] || statusConfig.disconnected;
 
     return (
-        <Card className="card-hover">
+        <Card 
+            className="card-hover cursor-pointer transition-all hover:border-primary/50"
+            onClick={() => onViewDetails?.(connection)}
+        >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                     <div className="flex items-center space-x-2">
@@ -123,7 +128,7 @@ export function ConnectionCard({
                     })}
                 </p>
             </CardContent>
-            <CardFooter className="flex justify-between">
+            <CardFooter className="flex justify-between" onClick={(e) => e.stopPropagation()}>
                 <Button
                     variant="ghost"
                     size="sm"

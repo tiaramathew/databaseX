@@ -8,6 +8,7 @@ import { ConnectionCard } from "@/components/connections/ConnectionCard";
 import { ConnectionForm } from "@/components/connections/ConnectionForm";
 import { WebhookConnectionForm } from "@/components/connections/WebhookConnectionForm";
 import { MCPConnectionForm } from "@/components/connections/MCPConnectionForm";
+import { ConnectionDetails } from "@/components/connections/ConnectionDetails";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Database, Webhook, Cpu } from "lucide-react";
@@ -45,6 +46,13 @@ export default function ConnectionsPage() {
     const [open, setOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
     const [syncingId, setSyncingId] = useState<string | null>(null);
+    const [selectedConnection, setSelectedConnection] = useState<ConnectionConfig | null>(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
+
+    const handleViewDetails = useCallback((connection: ConnectionConfig) => {
+        setSelectedConnection(connection);
+        setDetailsOpen(true);
+    }, []);
 
     const handleEdit = useCallback((id: string) => {
         toast.info("Edit functionality", {
@@ -179,6 +187,7 @@ export default function ConnectionsPage() {
                                 onDelete={(id) => setDeleteTarget(id)}
                                 onEdit={handleEdit}
                                 onSync={handleSync}
+                                onViewDetails={handleViewDetails}
                                 isSyncing={syncingId === connection.id}
                             />
                         </motion.div>
@@ -212,6 +221,17 @@ export default function ConnectionsPage() {
                 confirmText="Remove"
                 variant="destructive"
                 onConfirm={handleDeleteConfirm}
+            />
+
+            <ConnectionDetails
+                connection={selectedConnection}
+                open={detailsOpen}
+                onOpenChange={setDetailsOpen}
+                onSync={handleSync}
+                onDelete={(id) => {
+                    setDetailsOpen(false);
+                    setDeleteTarget(id);
+                }}
             />
         </>
     );
