@@ -46,6 +46,7 @@ const itemVariants = {
 
 export default function SearchPage() {
     const collections = useStore((state) => state.collections);
+    const connections = useStore((state) => state.connections);
     const mcpConnections = useStore((state) => state.mcpConnections);
     const webhookConnections = useStore((state) => state.webhookConnections);
 
@@ -54,8 +55,31 @@ export default function SearchPage() {
     const [topK, setTopK] = useState([5]);
     const [minScore, setMinScore] = useState([0.5]);
 
-    // Build agents list from MCP and Webhook connections
+    // Build agents list from:
+    // 1. Main connections array (type === "mcp" or "webhook")
+    // 2. Legacy mcpConnections and webhookConnections arrays
     const agents: AIAgent[] = [
+        // MCP connections from main connections array
+        ...connections
+            .filter((c) => c.type === "mcp")
+            .map((mcp) => ({
+                id: mcp.id,
+                name: mcp.name,
+                type: "mcp" as const,
+                endpoint: (mcp.config as any)?.url || (mcp.config as any)?.command || "",
+                status: mcp.status,
+            })),
+        // Webhook connections from main connections array
+        ...connections
+            .filter((c) => c.type === "webhook")
+            .map((webhook) => ({
+                id: webhook.id,
+                name: webhook.name,
+                type: "webhook" as const,
+                endpoint: (webhook.config as any)?.baseUrl || "",
+                status: webhook.status,
+            })),
+        // Legacy mcpConnections array
         ...mcpConnections.map((mcp) => ({
             id: mcp.id,
             name: mcp.name,
@@ -63,8 +87,9 @@ export default function SearchPage() {
             endpoint: mcp.endpoint,
             status: mcp.status,
         })),
+        // Legacy webhookConnections array (filtered by event types)
         ...webhookConnections
-            .filter((w) => w.eventTypes.includes("rag.query") || w.eventTypes.includes("*"))
+            .filter((w) => w.eventTypes?.includes("rag.query") || w.eventTypes?.includes("*"))
             .map((webhook) => ({
                 id: webhook.id,
                 name: webhook.name,
@@ -72,7 +97,10 @@ export default function SearchPage() {
                 endpoint: webhook.url,
                 status: webhook.status,
             })),
-    ];
+    ].filter((agent, index, self) => 
+        // Remove duplicates by id
+        index === self.findIndex((a) => a.id === agent.id)
+    );
 
     // Set default collection when available
     useEffect(() => {
