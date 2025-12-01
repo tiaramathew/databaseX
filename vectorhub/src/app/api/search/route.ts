@@ -20,7 +20,7 @@ function getConnectionConfig(request: Request): ConnectionConfig | null {
 }
 
 // Vector search in MongoDB Atlas
-async function searchMongoDBVectors(
+export async function searchMongoDBVectors(
     config: MongoDBAtlasConfig,
     collection: string,
     vector: number[],
@@ -74,7 +74,7 @@ async function searchMongoDBVectors(
 }
 
 // Text search in MongoDB (fallback when no vector provided)
-async function searchMongoDBText(
+export async function searchMongoDBText(
     config: MongoDBAtlasConfig,
     collection: string,
     text: string,
