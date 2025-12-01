@@ -38,20 +38,20 @@ import {
     Link as LinkIcon,
     FileSpreadsheet,
     FileType,
-}
+} from "lucide-react";
 
 interface ScrapeJob {
     id: string;
     url: string;
     status: "pending" | "scraping" | "completed" | "error";
     progress: number;
-    title ?: string;
-    content ?: string;
-    documentType ?: string;
-    wordCount ?: number;
-    error ?: string;
-    lastScraped ?: Date;
-    hasChanges ?: boolean;
+    title?: string;
+    content?: string;
+    documentType?: string;
+    wordCount?: number;
+    error?: string;
+    lastScraped?: Date;
+    hasChanges?: boolean;
 }
 
 export interface ScrapedDocument {
