@@ -150,6 +150,7 @@ export async function POST(request: Request) {
             let results: SearchResult[];
 
             if (query.vector) {
+                logger.info(`Received vector query. Dimensions: ${query.vector.length}`);
                 results = await searchMongoDBVectors(
                     mongoConfig,
                     collection,
@@ -161,6 +162,7 @@ export async function POST(request: Request) {
                 // Generate embedding for text query if vector is not provided
                 try {
                     const vector = await generateEmbedding(query.text);
+                    logger.info(`Generated embedding for search query. Dimensions: ${vector.length}`);
                     results = await searchMongoDBVectors(
                         mongoConfig,
                         collection,
