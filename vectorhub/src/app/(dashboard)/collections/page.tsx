@@ -62,11 +62,18 @@ export default function CollectionsPage() {
         setDetailsOpen(true);
     }, []);
 
+    // Auto-select first connection if none is selected
+    useEffect(() => {
+        if (!activeConnectionId && connections.length > 0) {
+            setActiveConnection(connections[0].id);
+        }
+    }, [activeConnectionId, connections, setActiveConnection]);
+
     useEffect(() => {
         let mounted = true;
 
         const loadCollections = async () => {
-            if (!activeConnectionId) {
+            if (!activeConnectionId || !activeConnection) {
                 setCollections([]);
                 setIsLoading(false);
                 return;
@@ -74,17 +81,17 @@ export default function CollectionsPage() {
 
             setIsLoading(true);
             try {
-                // Pass the active connection config to the API
-                if (activeConnection) {
-                    const data = await listCollectionsApi(activeConnection);
-                    if (mounted) {
-                        setCollections(data);
-                    }
+                const data = await listCollectionsApi(activeConnection);
+                if (mounted) {
+                    setCollections(data);
+                    toast.success(`Found ${data.length} collection${data.length !== 1 ? 's' : ''}`);
                 }
-            } catch {
-                // Collections from store are used if API fails
+            } catch (error) {
+                // Show error to user
                 if (mounted) {
                     setCollections([]);
+                    const message = error instanceof Error ? error.message : "Failed to fetch collections";
+                    toast.error("Failed to fetch collections", { description: message });
                 }
             } finally {
                 if (mounted) {

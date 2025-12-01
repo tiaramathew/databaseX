@@ -47,6 +47,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { listCollectionsApi } from "@/lib/api/collections";
 
 interface ConnectionDetailsProps {
     connection: ConnectionConfig | null;
@@ -74,69 +75,44 @@ interface ConnectionStats {
     uptime: string;
 }
 
-// Mock function to fetch connection details
+// Fetch real connection details from the database
 async function fetchConnectionDetails(connection: ConnectionConfig): Promise<{
     collections: CollectionInfo[];
     stats: ConnectionStats;
     serverInfo: Record<string, string>;
 }> {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 500));
-
-    // Generate mock collections based on connection type
-    const mockCollections: CollectionInfo[] = [
-        {
-            name: "documents",
-            documentCount: Math.floor(Math.random() * 10000) + 500,
-            dimensions: 1536,
-            indexType: "HNSW",
-            size: `${(Math.random() * 500 + 50).toFixed(1)} MB`,
-            lastModified: new Date(Date.now() - Math.random() * 86400000 * 7),
-        },
-        {
-            name: "embeddings",
-            documentCount: Math.floor(Math.random() * 5000) + 200,
-            dimensions: 768,
-            indexType: "IVF_FLAT",
-            size: `${(Math.random() * 200 + 20).toFixed(1)} MB`,
-            lastModified: new Date(Date.now() - Math.random() * 86400000 * 3),
-        },
-        {
-            name: "knowledge_base",
-            documentCount: Math.floor(Math.random() * 2000) + 100,
-            dimensions: 1536,
-            indexType: "HNSW",
-            size: `${(Math.random() * 100 + 10).toFixed(1)} MB`,
-            lastModified: new Date(Date.now() - Math.random() * 86400000),
-        },
-    ];
-
-    // Add more collections randomly
-    if (Math.random() > 0.5) {
-        mockCollections.push({
-            name: "user_queries",
-            documentCount: Math.floor(Math.random() * 500) + 50,
-            dimensions: 1536,
-            indexType: "FLAT",
-            size: `${(Math.random() * 50 + 5).toFixed(1)} MB`,
+    // Fetch real collections from the database
+    let fetchedCollections: CollectionInfo[] = [];
+    
+    try {
+        const apiCollections = await listCollectionsApi(connection);
+        fetchedCollections = apiCollections.map((col) => ({
+            name: col.name,
+            documentCount: col.documentCount || 0,
+            dimensions: col.dimensions,
+            indexType: col.distanceMetric === "cosine" ? "HNSW" : "IVF_FLAT",
+            size: `${((col.documentCount || 0) * 0.05).toFixed(1)} MB`, // Estimate size
             lastModified: new Date(),
-        });
+        }));
+    } catch (error) {
+        console.error("Failed to fetch collections:", error);
+        // Return empty array on error
     }
 
-    const totalDocs = mockCollections.reduce((acc, c) => acc + c.documentCount, 0);
+    const totalDocs = fetchedCollections.reduce((acc, c) => acc + c.documentCount, 0);
 
     const stats: ConnectionStats = {
         totalDocuments: totalDocs,
-        totalCollections: mockCollections.length,
-        storageUsed: `${(Math.random() * 2 + 0.5).toFixed(2)} GB`,
-        queriesPerDay: Math.floor(Math.random() * 10000) + 1000,
-        avgLatency: Math.floor(Math.random() * 50) + 10,
-        uptime: "99.9%",
+        totalCollections: fetchedCollections.length,
+        storageUsed: `${(totalDocs * 0.0001).toFixed(2)} GB`, // Rough estimate
+        queriesPerDay: 0, // Not available from API
+        avgLatency: 0, // Not available from API
+        uptime: connection.status === "connected" ? "Online" : "Offline",
     };
 
     const serverInfo = getServerInfo(connection);
 
-    return { collections: mockCollections, stats, serverInfo };
+    return { collections: fetchedCollections, stats, serverInfo };
 }
 
 function getServerInfo(connection: ConnectionConfig): Record<string, string> {
