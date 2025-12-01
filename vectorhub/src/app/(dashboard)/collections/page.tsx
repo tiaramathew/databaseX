@@ -16,6 +16,7 @@ import {
     deleteCollectionApi,
     listCollectionsApi,
     getCollectionStatsApi,
+    updateCollectionApi,
 } from "@/lib/api/collections";
 import { Layers } from "lucide-react";
 import {
@@ -25,6 +26,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -158,8 +161,12 @@ export default function CollectionsPage() {
 
     const handleEditSave = useCallback(
         async (name: string, updates: Partial<CollectionInfo>) => {
+            if (!activeConnection) return;
             const toastId = toast.loading("Updating collection...");
             try {
+                // Update on server
+                await updateCollectionApi(name, updates, activeConnection);
+
                 // Update in store
                 const collection = collections.find((c) => c.name === name);
                 if (collection) {
@@ -180,7 +187,7 @@ export default function CollectionsPage() {
                 throw new Error("Failed to update");
             }
         },
-        [collections, setCollections]
+        [collections, setCollections, activeConnection]
     );
 
     const handleViewStats = useCallback(async (name: string) => {
@@ -261,6 +268,34 @@ export default function CollectionsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                                // Force reload by clearing collections first
+                                setCollections([]);
+                                setIsLoading(true);
+                                // The useEffect will trigger reload because activeConnectionId is set
+                                // But to be sure, we can just trigger a re-fetch if we extract loadCollections
+                                // For now, toggling loading state is a simple hack, or we can expose a refresh function
+                                // Let's just call the API directly here to be cleaner
+                                if (activeConnection) {
+                                    const toastId = toast.loading("Refreshing...");
+                                    listCollectionsApi(activeConnection)
+                                        .then((data) => {
+                                            setCollections(data);
+                                            toast.success("Collections refreshed", { id: toastId });
+                                        })
+                                        .catch(() => {
+                                            toast.error("Failed to refresh", { id: toastId });
+                                        })
+                                        .finally(() => setIsLoading(false));
+                                }
+                            }}
+                            disabled={!activeConnection || isLoading}
+                        >
+                            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                        </Button>
                         <CreateCollectionModal onSubmit={handleCreate} disabled={!activeConnectionId} />
                     </div>
                 </motion.div>

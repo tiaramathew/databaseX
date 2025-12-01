@@ -1,6 +1,8 @@
 import { MockAdapter } from "./adapters/mock-adapter";
 import { WebhookAdapter } from "./adapters/webhook-adapter";
 import { MCPAdapter } from "./adapters/mcp-adapter";
+import { MongoDBAdapter } from "./adapters/mongodb-adapter";
+import { SupabaseAdapter } from "./adapters/supabase-adapter";
 import type {
     VectorDBAdapter,
     CreateCollectionConfig,
@@ -10,6 +12,7 @@ import type {
     CollectionInfo,
     DatabaseInfo,
     CollectionStats,
+    UpdateCollectionConfig,
 } from "./adapters/base";
 import type { ConnectionConfig, VectorDBType } from "@/types/connections";
 
@@ -19,6 +22,10 @@ function createAdapter(type: VectorDBType): VectorDBAdapter {
             return new WebhookAdapter();
         case "mcp":
             return new MCPAdapter();
+        case "mongodb_atlas":
+            return new MongoDBAdapter();
+        case "supabase":
+            return new SupabaseAdapter();
         default:
             return new MockAdapter();
     }
@@ -70,6 +77,10 @@ export class VectorDBClient {
 
     getCollection(name: string): Promise<CollectionInfo> {
         return this.adapter.getCollection(name);
+    }
+
+    updateCollection(name: string, updates: UpdateCollectionConfig): Promise<void> {
+        return this.adapter.updateCollection(name, updates);
     }
 
     deleteCollection(name: string, cascade?: boolean): Promise<void> {

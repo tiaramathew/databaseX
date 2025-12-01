@@ -71,3 +71,12 @@ export async function getCollectionStatsApi(name: string, config?: ConnectionCon
     });
     return handleResponse<CollectionStats>(res);
 }
+
+export async function updateCollectionApi(name: string, updates: Partial<CollectionInfo>, config?: ConnectionConfig): Promise<void> {
+    const res = await fetch(`${BASE_URL}/${encodeURIComponent(name)}`, {
+        method: "PATCH",
+        headers: getHeaders(config),
+        body: JSON.stringify(updates),
+    });
+    await handleResponse<{ ok: boolean }>(res);
+}

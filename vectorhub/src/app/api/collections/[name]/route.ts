@@ -47,7 +47,7 @@ export async function DELETE(
         const { searchParams } = new URL(request.url);
         const cascade = searchParams.get("cascade") === "true";
 
-        await client.deleteCollection(name, cascade);
+        await client.deleteCollection(name);
         return NextResponse.json({ ok: true });
     } catch (error) {
         logger.error(`DELETE /api/collections/${name} failed`, error);
@@ -55,6 +55,30 @@ export async function DELETE(
             {
                 code: "INTERNAL_ERROR",
                 message: error instanceof Error ? error.message : "Failed to delete collection",
+            },
+            { status: 500 }
+        );
+    }
+}
+
+export async function PATCH(
+    request: Request,
+    { params }: { params: Promise<{ name: string }> }
+) {
+    const { name } = await params;
+    try {
+        const client = getClient(request);
+        const updates = await request.json();
+
+        await client.updateCollection(name, updates);
+
+        return NextResponse.json({ ok: true });
+    } catch (error) {
+        logger.error(`PATCH /api/collections/${name} failed`, error);
+        return NextResponse.json(
+            {
+                code: "INTERNAL_ERROR",
+                message: error instanceof Error ? error.message : "Failed to update collection",
             },
             { status: 500 }
         );
