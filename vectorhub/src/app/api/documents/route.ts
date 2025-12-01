@@ -229,6 +229,16 @@ export async function POST(request: Request) {
             }
         }
 
+        if (processedDocs.length === 0) {
+            return NextResponse.json(
+                {
+                    code: "PROCESSING_FAILED",
+                    message: "Failed to process any documents. Embedding generation may have failed.",
+                },
+                { status: 500 }
+            );
+        }
+
         if (connectionConfig?.type === "mongodb_atlas") {
             const mongoConfig = connectionConfig.config as MongoDBAtlasConfig;
             const ids = await addMongoDBDocuments(mongoConfig, collection, processedDocs);
