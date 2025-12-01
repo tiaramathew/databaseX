@@ -7,6 +7,18 @@ export type VectorDBType =
     | 'qdrant'
     | 'redis'
     | 'upstash'
+    | 'neo4j'
+    | 'milvus'
+    | 'elasticsearch'
+    | 'pgvector'
+    | 'opensearch'
+    | 'astra_db'
+    | 'singlestore'
+    | 'vespa'
+    | 'typesense'
+    | 'marqo'
+    | 'turbopuffer'
+    | 'lancedb'
     | 'webhook'
     | 'mcp';
 
@@ -25,6 +37,18 @@ export interface ConnectionConfig {
     | QdrantConfig
     | RedisConfig
     | UpstashConfig
+    | Neo4jConfig
+    | MilvusConfig
+    | ElasticsearchConfig
+    | PgvectorConfig
+    | OpenSearchConfig
+    | AstraDBConfig
+    | SingleStoreConfig
+    | VespaConfig
+    | TypesenseConfig
+    | MarqoConfig
+    | TurbopufferConfig
+    | LanceDBConfig
     | WebhookConfig
     | MCPConfig;
 }
@@ -83,6 +107,106 @@ export interface RedisConfig {
 export interface UpstashConfig {
     url: string;
     token: string;
+}
+
+// Graph Databases
+export interface Neo4jConfig {
+    uri: string;
+    username: string;
+    password: string;
+    database?: string;
+    indexName?: string;
+}
+
+// Vector Databases
+export interface MilvusConfig {
+    host: string;
+    port: number;
+    username?: string;
+    password?: string;
+    secure: boolean;
+    database?: string;
+}
+
+export interface ElasticsearchConfig {
+    node: string;
+    apiKey?: string;
+    username?: string;
+    password?: string;
+    cloudId?: string;
+    indexName: string;
+}
+
+export interface PgvectorConfig {
+    host: string;
+    port: number;
+    database: string;
+    username: string;
+    password: string;
+    tableName: string;
+    dimensions: number;
+    ssl: boolean;
+}
+
+export interface OpenSearchConfig {
+    node: string;
+    username?: string;
+    password?: string;
+    awsRegion?: string;
+    indexName: string;
+    ssl: boolean;
+}
+
+export interface AstraDBConfig {
+    endpoint: string;
+    token: string;
+    namespace?: string;
+    collectionName: string;
+}
+
+export interface SingleStoreConfig {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    database: string;
+    tableName: string;
+}
+
+export interface VespaConfig {
+    endpoint: string;
+    applicationPackage: string;
+    apiKey?: string;
+    namespace: string;
+}
+
+export interface TypesenseConfig {
+    host: string;
+    port: number;
+    protocol: 'http' | 'https';
+    apiKey: string;
+    collectionName: string;
+}
+
+export interface MarqoConfig {
+    url: string;
+    apiKey?: string;
+    indexName: string;
+}
+
+export interface TurbopufferConfig {
+    apiKey: string;
+    namespace: string;
+}
+
+export interface LanceDBConfig {
+    uri: string;
+    tableName: string;
+    storageOptions?: {
+        awsAccessKeyId?: string;
+        awsSecretAccessKey?: string;
+        awsRegion?: string;
+    };
 }
 
 export interface WebhookConfig {

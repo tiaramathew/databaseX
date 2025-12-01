@@ -4,7 +4,7 @@ import { ConnectionConfig, VectorDBType } from "@/types/connections";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Database, Trash2, Edit, RefreshCw, Loader2, Webhook, Cpu } from "lucide-react";
+import { Database, Trash2, Edit, RefreshCw, Loader2, Webhook, Cpu, Search, GitBranch, Server, Cloud } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -41,8 +41,20 @@ const dbTypeLabels: Record<string, string> = {
     weaviate: "Weaviate",
     pinecone: "Pinecone",
     qdrant: "Qdrant",
-    redis: "Redis",
+    redis: "Redis Stack",
     upstash: "Upstash",
+    neo4j: "Neo4j",
+    milvus: "Milvus",
+    elasticsearch: "Elasticsearch",
+    pgvector: "PostgreSQL + pgvector",
+    opensearch: "OpenSearch",
+    astra_db: "Astra DB",
+    singlestore: "SingleStore",
+    vespa: "Vespa",
+    typesense: "Typesense",
+    marqo: "Marqo",
+    turbopuffer: "Turbopuffer",
+    lancedb: "LanceDB",
     webhook: "Webhook",
     mcp: "MCP Server",
 };
@@ -53,6 +65,23 @@ const getConnectionIcon = (type: VectorDBType) => {
             return <Webhook className="h-4 w-4 text-muted-foreground" />;
         case "mcp":
             return <Cpu className="h-4 w-4 text-muted-foreground" />;
+        case "neo4j":
+            return <GitBranch className="h-4 w-4 text-muted-foreground" />;
+        case "elasticsearch":
+        case "opensearch":
+        case "typesense":
+        case "vespa":
+            return <Search className="h-4 w-4 text-muted-foreground" />;
+        case "supabase":
+        case "mongodb_atlas":
+        case "astra_db":
+        case "upstash":
+        case "turbopuffer":
+            return <Cloud className="h-4 w-4 text-muted-foreground" />;
+        case "redis":
+        case "pgvector":
+        case "singlestore":
+            return <Server className="h-4 w-4 text-muted-foreground" />;
         default:
             return <Database className="h-4 w-4 text-muted-foreground" />;
     }
