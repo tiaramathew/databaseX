@@ -8,6 +8,13 @@ VectorHub is a modern, production-ready vector database management interface bui
 
 ## Recent Changes
 
+**December 1, 2025 - Collections Page Update**
+- ✅ Changed Collections page to RETRIEVE existing collections from connected databases (not create new ones)
+- ✅ Replaced "Create Collection" button with "Fetch Collections" button
+- ✅ Added context-aware empty states (no connection vs. no collections found)
+- ✅ Removed collection editing functionality (view-only mode)
+- ✅ Added "Go to Connections" link in empty state for better UX flow
+
 **December 1, 2025 - Webhook & MCP Integration**
 - ✅ Added Webhook connection type with customizable endpoints, authentication (API Key, Bearer, Basic), and retry logic
 - ✅ Added MCP connection type with server URL configuration and capability toggles

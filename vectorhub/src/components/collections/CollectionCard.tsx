@@ -4,13 +4,12 @@ import { CollectionInfo } from "@/lib/db/adapters/base";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Trash2, Edit, BarChart3, Hash } from "lucide-react";
+import { Layers, Trash2, BarChart3, Hash, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CollectionCardProps {
     collection: CollectionInfo;
-    onDelete: (name: string) => void;
-    onEdit: (name: string) => void;
+    onDelete?: (name: string) => void;
     onViewStats: (name: string) => void;
     onViewDetails?: (collection: CollectionInfo) => void;
 }
@@ -24,7 +23,6 @@ const metricColors: Record<string, string> = {
 export function CollectionCard({
     collection,
     onDelete,
-    onEdit,
     onViewStats,
     onViewDetails,
 }: CollectionCardProps) {
@@ -71,19 +69,22 @@ export function CollectionCard({
                 <div className="flex space-x-1">
                     <Button
                         variant="ghost"
-                        size="icon"
-                        onClick={() => onEdit(collection.name)}
+                        size="sm"
+                        onClick={() => onViewDetails?.(collection)}
                     >
-                        <Edit className="h-4 w-4" />
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => onDelete(collection.name)}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {onDelete && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => onDelete(collection.name)}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    )}
                 </div>
             </CardFooter>
         </Card>

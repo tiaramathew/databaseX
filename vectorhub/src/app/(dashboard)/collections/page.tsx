@@ -5,20 +5,16 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/store";
 import { CollectionCard } from "@/components/collections/CollectionCard";
-import { CreateCollectionModal } from "@/components/collections/CreateCollectionModal";
 import { CollectionDetails } from "@/components/collections/CollectionDetails";
-import { EditCollectionModal } from "@/components/collections/EditCollectionModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SkeletonCard } from "@/components/ui/skeleton";
-import { CreateCollectionConfig, CollectionInfo } from "@/lib/db/adapters/base";
+import { CollectionInfo } from "@/lib/db/adapters/base";
 import {
-    createCollectionApi,
     deleteCollectionApi,
     listCollectionsApi,
     getCollectionStatsApi,
-    updateCollectionApi,
 } from "@/lib/api/collections";
-import { Layers } from "lucide-react";
+import { Layers, RefreshCw, Database, Link2 } from "lucide-react";
 import {
     Select,
     SelectContent,
@@ -27,7 +23,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -60,8 +56,6 @@ export default function CollectionsPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [selectedCollection, setSelectedCollection] = useState<CollectionInfo | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
-    const [editCollection, setEditCollection] = useState<CollectionInfo | null>(null);
-    const [editOpen, setEditOpen] = useState(false);
 
     const handleViewDetails = useCallback((collection: CollectionInfo) => {
         setSelectedCollection(collection);
@@ -106,26 +100,21 @@ export default function CollectionsPage() {
         };
     }, [activeConnectionId, activeConnection, setCollections]);
 
-    const handleCreate = useCallback(
-        async (config: CreateCollectionConfig) => {
-            if (!activeConnection) return;
-            const toastId = toast.loading("Creating collection...");
-            try {
-                const created = await createCollectionApi(config, activeConnection);
-                addCollection(created);
-                toast.success("Collection created successfully", {
-                    id: toastId,
-                    description: `"${created.name}" is ready to use.`,
-                });
-            } catch {
-                toast.error("Failed to create collection", {
-                    id: toastId,
-                    description: "Please check your configuration and try again.",
-                });
-            }
-        },
-        [addCollection, activeConnection]
-    );
+    const handleRefresh = useCallback(async () => {
+        if (!activeConnection) return;
+        setIsLoading(true);
+        const toastId = toast.loading("Fetching collections from database...");
+        try {
+            const data = await listCollectionsApi(activeConnection);
+            setCollections(data);
+            toast.success(`Found ${data.length} collection${data.length !== 1 ? 's' : ''}`, { id: toastId });
+        } catch {
+            toast.error("Failed to fetch collections", { id: toastId });
+            setCollections([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [activeConnection, setCollections]);
 
     const handleDeleteConfirm = useCallback(async () => {
         if (!deleteTarget || !activeConnection) return;
@@ -151,45 +140,6 @@ export default function CollectionsPage() {
         setDeleteTarget(name);
     }, []);
 
-    const handleEdit = useCallback((name: string) => {
-        const collection = collections.find((c) => c.name === name);
-        if (collection) {
-            setEditCollection(collection);
-            setEditOpen(true);
-        }
-    }, [collections]);
-
-    const handleEditSave = useCallback(
-        async (name: string, updates: Partial<CollectionInfo>) => {
-            if (!activeConnection) return;
-            const toastId = toast.loading("Updating collection...");
-            try {
-                // Update on server
-                await updateCollectionApi(name, updates, activeConnection);
-
-                // Update in store
-                const collection = collections.find((c) => c.name === name);
-                if (collection) {
-                    const updatedCollections = collections.map((c) =>
-                        c.name === name ? { ...c, ...updates } : c
-                    );
-                    setCollections(updatedCollections);
-                }
-                toast.success("Collection updated", {
-                    id: toastId,
-                    description: `"${updates.name || name}" has been updated.`,
-                });
-            } catch {
-                toast.error("Failed to update collection", {
-                    id: toastId,
-                    description: "An error occurred while updating the collection.",
-                });
-                throw new Error("Failed to update");
-            }
-        },
-        [collections, setCollections, activeConnection]
-    );
-
     const handleViewStats = useCallback(async (name: string) => {
         if (!activeConnection) return;
         const toastId = toast.loading("Loading stats...");
@@ -214,7 +164,7 @@ export default function CollectionsPage() {
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Collections</h2>
                         <p className="text-muted-foreground">
-                            Manage your vector collections and indices.
+                            Retrieve and connect to existing collections from your databases.
                         </p>
                     </div>
                 </div>
@@ -242,7 +192,7 @@ export default function CollectionsPage() {
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Collections</h2>
                         <p className="text-muted-foreground">
-                            Manage your vector collections and indices.
+                            Retrieve and connect to existing collections from your databases.
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
@@ -269,34 +219,14 @@ export default function CollectionsPage() {
                             </Select>
                         </div>
                         <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => {
-                                // Force reload by clearing collections first
-                                setCollections([]);
-                                setIsLoading(true);
-                                // The useEffect will trigger reload because activeConnectionId is set
-                                // But to be sure, we can just trigger a re-fetch if we extract loadCollections
-                                // For now, toggling loading state is a simple hack, or we can expose a refresh function
-                                // Let's just call the API directly here to be cleaner
-                                if (activeConnection) {
-                                    const toastId = toast.loading("Refreshing...");
-                                    listCollectionsApi(activeConnection)
-                                        .then((data) => {
-                                            setCollections(data);
-                                            toast.success("Collections refreshed", { id: toastId });
-                                        })
-                                        .catch(() => {
-                                            toast.error("Failed to refresh", { id: toastId });
-                                        })
-                                        .finally(() => setIsLoading(false));
-                                }
-                            }}
+                            variant="default"
+                            onClick={handleRefresh}
                             disabled={!activeConnection || isLoading}
+                            className="gap-2"
                         >
                             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                            Fetch Collections
                         </Button>
-                        <CreateCollectionModal onSubmit={handleCreate} disabled={!activeConnectionId} />
                     </div>
                 </motion.div>
 
@@ -309,13 +239,32 @@ export default function CollectionsPage() {
                             <CollectionCard
                                 collection={collection}
                                 onDelete={handleDelete}
-                                onEdit={handleEdit}
                                 onViewStats={handleViewStats}
                                 onViewDetails={handleViewDetails}
                             />
                         </motion.div>
                     ))}
-                    {collections.length === 0 && (
+                    {collections.length === 0 && !activeConnectionId && (
+                        <motion.div
+                            variants={itemVariants}
+                            className="col-span-full flex h-[450px] flex-col items-center justify-center rounded-lg border border-dashed text-center"
+                        >
+                            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                                <Database className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-lg font-semibold">No connection selected</h3>
+                            <p className="mb-6 text-sm text-muted-foreground max-w-sm">
+                                First, add a database connection to retrieve your existing collections.
+                            </p>
+                            <Link href="/connections">
+                                <Button className="gap-2">
+                                    <Link2 className="h-4 w-4" />
+                                    Go to Connections
+                                </Button>
+                            </Link>
+                        </motion.div>
+                    )}
+                    {collections.length === 0 && activeConnectionId && (
                         <motion.div
                             variants={itemVariants}
                             className="col-span-full flex h-[450px] flex-col items-center justify-center rounded-lg border border-dashed text-center"
@@ -325,9 +274,12 @@ export default function CollectionsPage() {
                             </div>
                             <h3 className="text-lg font-semibold">No collections found</h3>
                             <p className="mb-6 text-sm text-muted-foreground max-w-sm">
-                                Create a collection to start storing and searching vector embeddings.
+                                No collections were found in this database. Click the button above to fetch collections, or ensure your database has existing collections.
                             </p>
-                            <CreateCollectionModal onSubmit={handleCreate} />
+                            <Button onClick={handleRefresh} className="gap-2">
+                                <RefreshCw className="h-4 w-4" />
+                                Fetch Collections
+                            </Button>
                         </motion.div>
                     )}
                 </motion.div>
@@ -352,13 +304,6 @@ export default function CollectionsPage() {
                     setDetailsOpen(false);
                     setDeleteTarget(name);
                 }}
-            />
-
-            <EditCollectionModal
-                collection={editCollection}
-                open={editOpen}
-                onOpenChange={setEditOpen}
-                onSave={handleEditSave}
             />
         </>
     );
