@@ -228,29 +228,30 @@ export interface WebhookConfig {
 export interface MCPConfig {
     // Transport type
     type: 'stdio' | 'sse';
-    
+
     // For stdio transport
     command?: string;
     args?: string[];
     env?: Record<string, string>;
-    
+
     // For SSE transport
     url?: string;
-    
+
     // Webhook URL for HTTP-based AI queries (n8n, Make.com, etc.)
     webhookUrl?: string;
-    
+
     // Common options
     serverName?: string;
     authToken?: string;
     timeout?: number;
-    
+
     // Capabilities (auto-detected or manually set)
     capabilities?: {
         tools?: boolean;
         resources?: boolean;
         prompts?: boolean;
     };
+    [key: string]: unknown;
 }
 
 // Separate connection type status

@@ -170,7 +170,7 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
         setUrls((prev) => prev.filter((u) => u.id !== id));
     }, []);
 
-    const performScrape = async (job: ScrapeJob): Promise<ScrapeJob> => {
+    const performScrape = useCallback(async (job: ScrapeJob): Promise<ScrapeJob> => {
         try {
             // Initial progress
             setUrls((prev) =>
@@ -213,9 +213,7 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                 error: error instanceof Error ? error.message : "Failed to scrape content",
             };
         }
-    };
-
-
+    }, [scrapeFormat, onlyMainContent]);
 
     const handleScrape = useCallback(async () => {
         const pendingJobs = urls.filter((u) => u.status === "pending" || u.status === "error");
@@ -256,7 +254,7 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
         }
 
         setIsScraping(false);
-    }, [urls, enableChangeTracking, scrapeFormat, onlyMainContent]);
+    }, [urls, performScrape]);
 
     const handleUpload = useCallback(async () => {
         const completedJobs = urls.filter((u) => u.status === "completed" && u.content);
@@ -289,7 +287,7 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
 
         // Clear completed jobs
         setUrls((prev) => prev.filter((u) => u.status !== "completed"));
-    }, [urls, onUpload]);
+    }, [urls, onUpload, chunkSize, chunkOverlap]);
 
     const completedCount = urls.filter((u) => u.status === "completed").length;
     const pendingCount = urls.filter((u) => u.status === "pending" || u.status === "error").length;
@@ -415,87 +413,110 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                         </div>
                         <CardDescription className="text-xs">
                             Configure parsing formats and chunking strategy
-                            <Label>Output Format</Label>
-                            <Select
-                                value={scrapeFormat}
-                                onValueChange={(v) => setScrapeFormat(v as any)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="markdown">Markdown (Best for LLMs)</SelectItem>
-                                    <SelectItem value="html">Clean HTML</SelectItem>
-                                    <SelectItem value="rawHtml">Raw HTML</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex items-center justify-between space-y-0 pt-8">
-                            <div className="space-y-0.5">
-                                <Label className="text-sm">Only Main Content</Label>
-                                <p className="text-xs text-muted-foreground">
-                                    Skip navs, footers, ads
-                                </p>
-                            </div>
-                            <Switch
-                                checked={onlyMainContent}
-                                onCheckedChange={setOnlyMainContent}
-                            />
-                        </div>
-                    </div>
-                </div>
+                        </CardDescription>
+                    </CardHeader>
+                    <CollapsibleContent>
+                        <CardContent className="space-y-6 pt-0">
+                            <Separator className="mb-4" />
 
-                <Separator />
-
-                {/* Chunking Options */}
-                <div className="space-y-4">
-                    <h4 className="text-xs font-semibold uppercase text-muted-foreground">Chunking</h4>
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label>Chunk Size</Label>
-                                <span className="text-xs font-medium tabular-nums">
-                                    {chunkSize[0]} chars
-                                </span>
+                            <div className="flex justify-end">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={resetDefaults}
+                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    <RotateCcw className="h-3 w-3 mr-1" />
+                                    Reset to Defaults
+                                </Button>
                             </div>
-                            <Slider
-                                value={chunkSize}
-                                onValueChange={setChunkSize}
-                                min={100}
-                                max={4000}
-                                step={100}
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                                Target size for each text segment
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label>Chunk Overlap</Label>
-                                <span className="text-xs font-medium tabular-nums">
-                                    {chunkOverlap[0]} chars
-                                </span>
-                            </div>
-                            <Slider
-                                value={chunkOverlap}
-                                onValueChange={setChunkOverlap}
-                                min={0}
-                                max={500}
-                                step={10}
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                                Overlap between chunks to preserve context
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </CardContent>
-        </CollapsibleContent>
-                </Card >
-            </Collapsible >
 
-        {/* Supported Formats Info */ }
-        < Card >
+                            {/* Parsing Options */}
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-semibold uppercase text-muted-foreground">Parsing</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Output Format</Label>
+                                        <Select
+                                            value={scrapeFormat}
+                                            onValueChange={(v) => setScrapeFormat(v as any)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="markdown">Markdown (Best for LLMs)</SelectItem>
+                                                <SelectItem value="html">Clean HTML</SelectItem>
+                                                <SelectItem value="rawHtml">Raw HTML</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex items-center justify-between space-y-0 pt-8">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-sm">Only Main Content</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Skip navs, footers, ads
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={onlyMainContent}
+                                            onCheckedChange={setOnlyMainContent}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* Chunking Options */}
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-semibold uppercase text-muted-foreground">Chunking</h4>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Chunk Size</Label>
+                                            <span className="text-xs font-medium tabular-nums">
+                                                {chunkSize[0]} chars
+                                            </span>
+                                        </div>
+                                        <Slider
+                                            value={chunkSize}
+                                            onValueChange={setChunkSize}
+                                            min={100}
+                                            max={4000}
+                                            step={100}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Target size for each text segment
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Chunk Overlap</Label>
+                                            <span className="text-xs font-medium tabular-nums">
+                                                {chunkOverlap[0]} chars
+                                            </span>
+                                        </div>
+                                        <Slider
+                                            value={chunkOverlap}
+                                            onValueChange={setChunkOverlap}
+                                            min={0}
+                                            max={500}
+                                            step={10}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Overlap between chunks to preserve context
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </CollapsibleContent>
+                </Card>
+            </Collapsible>
+
+            {/* Supported Formats Info */}
+            <Card>
                 <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                         <FileText className="h-4 w-4" />
@@ -515,150 +536,145 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                         ))}
                     </div>
                 </CardContent>
-            </Card >
+            </Card>
 
-        {/* URL List */ }
-    {
-        urls.length > 0 && (
-            <Card>
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium">
-                            URLs to Scrape ({urls.length})
-                        </CardTitle>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {completedCount > 0 && (
-                                <Badge variant="secondary">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    {completedCount} ready
-                                </Badge>
-                            )}
-                            {totalWords > 0 && (
-                                <Badge variant="outline">{totalWords.toLocaleString()} words</Badge>
-                            )}
+            {/* URL List */}
+            {urls.length > 0 && (
+                <Card>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-medium">
+                                URLs to Scrape ({urls.length})
+                            </CardTitle>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                {completedCount > 0 && (
+                                    <Badge variant="secondary">
+                                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                                        {completedCount} ready
+                                    </Badge>
+                                )}
+                                {totalWords > 0 && (
+                                    <Badge variant="outline">{totalWords.toLocaleString()} words</Badge>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <ScrollArea className="h-[250px]">
-                        <AnimatePresence>
-                            <div className="space-y-2">
-                                {urls.map((job) => (
-                                    <motion.div
-                                        key={job.id}
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, x: -10 }}
-                                        className={cn(
-                                            "flex items-center gap-3 p-3 rounded-lg border",
-                                            job.status === "completed" && "bg-emerald-500/5 border-emerald-500/20",
-                                            job.status === "error" && "bg-destructive/5 border-destructive/20",
-                                            job.status === "scraping" && "bg-primary/5 border-primary/20"
-                                        )}
-                                    >
-                                        <div className="flex-shrink-0">
-                                            {job.status === "scraping" ? (
-                                                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                                            ) : job.status === "completed" ? (
-                                                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                                            ) : job.status === "error" ? (
-                                                <AlertCircle className="h-5 w-5 text-destructive" />
-                                            ) : job.documentType === "pdf" ? (
-                                                <FileText className="h-5 w-5 text-muted-foreground" />
-                                            ) : job.documentType === "excel" ? (
-                                                <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-                                            ) : job.documentType === "word" ? (
-                                                <FileType className="h-5 w-5 text-muted-foreground" />
-                                            ) : (
-                                                <Globe className="h-5 w-5 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <ScrollArea className="h-[250px]">
+                            <AnimatePresence>
+                                <div className="space-y-2">
+                                    {urls.map((job) => (
+                                        <motion.div
+                                            key={job.id}
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, x: -10 }}
+                                            className={cn(
+                                                "flex items-center gap-3 p-3 rounded-lg border",
+                                                job.status === "completed" && "bg-emerald-500/5 border-emerald-500/20",
+                                                job.status === "error" && "bg-destructive/5 border-destructive/20",
+                                                job.status === "scraping" && "bg-primary/5 border-primary/20"
                                             )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-sm font-medium truncate">
-                                                    {job.title || new URL(job.url).hostname}
-                                                </p>
-                                                {job.hasChanges && (
-                                                    <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20">
-                                                        <RefreshCw className="h-2 w-2 mr-1" />
-                                                        Changed
-                                                    </Badge>
+                                        >
+                                            <div className="flex-shrink-0">
+                                                {job.status === "scraping" ? (
+                                                    <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                                                ) : job.status === "completed" ? (
+                                                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                                ) : job.status === "error" ? (
+                                                    <AlertCircle className="h-5 w-5 text-destructive" />
+                                                ) : job.documentType === "pdf" ? (
+                                                    <FileText className="h-5 w-5 text-muted-foreground" />
+                                                ) : job.documentType === "excel" ? (
+                                                    <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                                                ) : job.documentType === "word" ? (
+                                                    <FileType className="h-5 w-5 text-muted-foreground" />
+                                                ) : (
+                                                    <Globe className="h-5 w-5 text-muted-foreground" />
                                                 )}
                                             </div>
-                                            <p className="text-xs text-muted-foreground truncate">
-                                                {job.url}
-                                            </p>
-                                            {job.status === "scraping" && (
-                                                <Progress value={job.progress} className="h-1 mt-2" />
-                                            )}
-                                            {job.status === "completed" && job.wordCount && (
-                                                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                                                    {job.wordCount.toLocaleString()} words extracted
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-medium truncate">
+                                                        {job.title || new URL(job.url).hostname}
+                                                    </p>
+                                                    {job.hasChanges && (
+                                                        <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20">
+                                                            <RefreshCw className="h-2 w-2 mr-1" />
+                                                            Changed
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground truncate">
+                                                    {job.url}
                                                 </p>
-                                            )}
-                                            {job.status === "error" && (
-                                                <p className="text-xs text-destructive mt-1">{job.error}</p>
-                                            )}
-                                        </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="flex-shrink-0"
-                                            onClick={() => removeUrl(job.id)}
-                                            disabled={job.status === "scraping"}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </AnimatePresence>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        )
-    }
+                                                {job.status === "scraping" && (
+                                                    <Progress value={job.progress} className="h-1 mt-2" />
+                                                )}
+                                                {job.status === "completed" && job.wordCount && (
+                                                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                                                        {job.wordCount.toLocaleString()} words extracted
+                                                    </p>
+                                                )}
+                                                {job.status === "error" && (
+                                                    <p className="text-xs text-destructive mt-1">{job.error}</p>
+                                                )}
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="flex-shrink-0"
+                                                onClick={() => removeUrl(job.id)}
+                                                disabled={job.status === "scraping"}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            </AnimatePresence>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            )}
 
-    {/* Actions */ }
-    <div className="flex justify-end gap-2">
-        {pendingCount > 0 && (
-            <Button
-                onClick={handleScrape}
-                disabled={disabled || isScraping}
-                variant="outline"
-            >
-                {isScraping ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                    <Zap className="mr-2 h-4 w-4" />
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+                {pendingCount > 0 && (
+                    <Button
+                        onClick={handleScrape}
+                        disabled={disabled || isScraping}
+                        variant="outline"
+                    >
+                        {isScraping ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Zap className="mr-2 h-4 w-4" />
+                        )}
+                        {isScraping ? "Scraping..." : `Scrape ${pendingCount} URL(s)`}
+                    </Button>
                 )}
-                {isScraping ? "Scraping..." : `Scrape ${pendingCount} URL(s)`}
-            </Button>
-        )}
-        {completedCount > 0 && (
-            <Button onClick={handleUpload} disabled={disabled || isScraping}>
-                <Download className="mr-2 h-4 w-4" />
-                Upload {completedCount} Document(s)
-            </Button>
-        )}
-    </div>
-
-    {/* Empty State */ }
-    {
-        urls.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                    <Globe className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium">No URLs added</h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                    Add website URLs or document links to scrape content and upload to your
-                    vector database.
-                </p>
+                {completedCount > 0 && (
+                    <Button onClick={handleUpload} disabled={disabled || isScraping}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Upload {completedCount} Document(s)
+                    </Button>
+                )}
             </div>
-        )
-    }
-        </div >
+
+            {/* Empty State */}
+            {urls.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
+                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                        <Globe className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-lg font-medium">No URLs added</h3>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                        Add website URLs or document links to scrape content and upload to your
+                        vector database.
+                    </p>
+                </div>
+            )}
+        </div>
     );
 }
-
