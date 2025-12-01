@@ -501,6 +501,9 @@ export async function POST(request: Request) {
             }
         }
 
+        // Filter out documents with empty content to prevent errors in downstream agents
+        context = context.filter(doc => doc.content && doc.content.trim().length > 0);
+
         // Step 2: Generate response based on agent type
         let response: string;
         let agentUsed: string;
