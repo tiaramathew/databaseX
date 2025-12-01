@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -120,27 +120,23 @@ const embeddingProviders = [
 ];
 
 export default function IntegrationsPage() {
-    const [apiKeys, setApiKeys] = useState<ApiKey[]>([
-        {
-            id: "1",
-            name: "OpenAI Production",
-            type: "llm",
-            provider: "openai",
-            key: "sk-proj-xxxxxxxxxxxxxxxxxxxxx",
-            createdAt: new Date("2024-01-15"),
-            lastUsed: new Date(),
-            isActive: true,
-        },
-        {
-            id: "2",
-            name: "Firecrawl API",
-            type: "scraper",
-            provider: "firecrawl",
-            key: "fc-xxxxxxxxxxxxx",
-            createdAt: new Date("2024-02-01"),
-            isActive: true,
-        },
-    ]);
+    const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+
+    const fetchKeys = useCallback(async () => {
+        try {
+            const res = await fetch("/api/integrations/keys");
+            if (res.ok) {
+                const data = await res.json();
+                setApiKeys(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch keys", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchKeys();
+    }, [fetchKeys]);
 
     const [mcpServers, setMcpServers] = useState<McpServer[]>([
         {
@@ -202,31 +198,40 @@ export default function IntegrationsPage() {
         }
     };
 
-    const handleAddKey = useCallback(() => {
+    const handleAddKey = useCallback(async () => {
         if (!newKeyName || !newKeyProvider || !newKeyValue) {
             toast.error("Please fill in all fields");
             return;
         }
 
-        const newKey: ApiKey = {
-            id: crypto.randomUUID(),
-            name: newKeyName,
-            type: newKeyType,
-            provider: newKeyProvider,
-            key: newKeyValue,
-            createdAt: new Date(),
-            isActive: true,
-        };
+        try {
+            // Determine the env key based on provider
+            let envKey = newKeyName.toUpperCase().replace(/\s+/g, "_");
+            if (newKeyProvider === "openai") envKey = "OPENAI_API_KEY";
+            if (newKeyProvider === "firecrawl") envKey = "FIRECRAWL_API_KEY";
+            if (newKeyProvider === "anthropic") envKey = "ANTHROPIC_API_KEY";
+            if (newKeyProvider === "cohere") envKey = "COHERE_API_KEY";
 
-        setApiKeys((prev) => [...prev, newKey]);
-        setAddKeyOpen(false);
-        setNewKeyName("");
-        setNewKeyProvider("");
-        setNewKeyValue("");
-        toast.success("API key added", {
-            description: `${newKeyName} has been saved securely.`,
-        });
-    }, [newKeyName, newKeyType, newKeyProvider, newKeyValue]);
+            const res = await fetch("/api/integrations/keys", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key: envKey, value: newKeyValue }),
+            });
+
+            if (!res.ok) throw new Error("Failed to save key");
+
+            await fetchKeys();
+            setAddKeyOpen(false);
+            setNewKeyName("");
+            setNewKeyProvider("");
+            setNewKeyValue("");
+            toast.success("API key added", {
+                description: `${newKeyName} has been saved.`,
+            });
+        } catch (error) {
+            toast.error("Failed to save key");
+        }
+    }, [newKeyName, newKeyType, newKeyProvider, newKeyValue, fetchKeys]);
 
     const handleAddMcp = useCallback(() => {
         if (!newMcpName) {
@@ -266,12 +271,21 @@ export default function IntegrationsPage() {
         });
     }, [newMcpName, newMcpType, newMcpCommand, newMcpArgs, newMcpEnv, newMcpUrl]);
 
-    const handleDeleteKey = (id: string) => {
-        const key = apiKeys.find((k) => k.id === id);
-        setApiKeys((prev) => prev.filter((k) => k.id !== id));
-        toast.success("API key removed", {
-            description: `${key?.name} has been deleted.`,
-        });
+    const handleDeleteKey = async (id: string) => {
+        try {
+            const res = await fetch("/api/integrations/keys", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key: id }),
+            });
+
+            if (!res.ok) throw new Error("Failed to delete key");
+
+            await fetchKeys();
+            toast.success("API key removed");
+        } catch (error) {
+            toast.error("Failed to delete key");
+        }
     };
 
     const handleDeleteMcp = (id: string) => {
