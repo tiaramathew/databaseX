@@ -128,6 +128,43 @@ However, I don't have any documents to search through yet, or no documents match
 *${agentName || "Vector Search"}*`;
 }
 
+// Make MCP JSON-RPC request
+async function mcpRequest(
+    url: string,
+    method: string,
+    params: Record<string, unknown>,
+    headers: Record<string, string>
+): Promise<any> {
+    const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: Date.now(),
+            method,
+            params,
+        }),
+    });
+    
+    const text = await response.text();
+    
+    // Parse SSE or JSON response
+    if (text.includes("data: ")) {
+        const lines = text.split("\n");
+        for (const line of lines) {
+            if (line.startsWith("data: ")) {
+                try {
+                    return JSON.parse(line.slice(6));
+                } catch {
+                    continue;
+                }
+            }
+        }
+    }
+    
+    return JSON.parse(text);
+}
+
 // Call any AI agent via HTTP (works for MCP SSE, webhooks, n8n, etc.)
 async function callHttpAgent(
     url: string,
@@ -145,88 +182,96 @@ async function callHttpAgent(
     
     // Add authorization header if provided
     if (authHeader) {
-        // Handle both "Bearer xxx" and just "xxx" formats
         headers["Authorization"] = authHeader.startsWith("Bearer ") 
             ? authHeader 
             : `Bearer ${authHeader}`;
     }
     
-    // Build MCP-compatible request body
-    const mcpRequest = {
-        jsonrpc: "2.0",
-        id: Date.now(),
-        method: "tools/call",
-        params: {
-            name: "query",
+    // Step 1: List available tools
+    logger.info("Fetching available MCP tools...");
+    let tools: { name: string; description?: string }[] = [];
+    
+    try {
+        const toolsResponse = await mcpRequest(url, "tools/list", {}, headers);
+        if (toolsResponse.result?.tools) {
+            tools = toolsResponse.result.tools;
+            logger.info(`Found ${tools.length} tools: ${tools.map(t => t.name).join(", ")}`);
+        }
+    } catch (err) {
+        logger.warn("Could not list tools, will try direct call");
+    }
+    
+    // Step 2: Find a suitable tool to call
+    // Look for tools that seem related to chat/query/message
+    const chatToolNames = ["chat", "message", "ask", "query", "send_message", "process", "execute", "run"];
+    let toolToUse = tools.find(t => chatToolNames.some(name => t.name.toLowerCase().includes(name)));
+    
+    // If no chat tool found, use the first available tool
+    if (!toolToUse && tools.length > 0) {
+        toolToUse = tools[0];
+    }
+    
+    // Step 3: Call the tool or try alternative methods
+    if (toolToUse) {
+        logger.info(`Calling tool: ${toolToUse.name}`);
+        
+        const toolResponse = await mcpRequest(url, "tools/call", {
+            name: toolToUse.name,
             arguments: {
-                query,
                 message: query,
-                context: context.map((c) => ({
-                    content: c.content,
-                    score: c.score,
-                    source: c.metadata?.source,
-                })),
+                query: query,
+                text: query,
+                input: query,
+                content: query,
+                context: context.length > 0 ? context.map(c => c.content).join("\n\n") : undefined,
             },
-        },
-    };
+        }, headers);
+        
+        if (toolResponse.error) {
+            throw new Error(toolResponse.error.message || "Tool call failed");
+        }
+        
+        // Parse tool response
+        const result = toolResponse.result;
+        if (result?.content) {
+            if (Array.isArray(result.content)) {
+                return result.content.map((c: any) => c.text || c.content || JSON.stringify(c)).join("\n");
+            }
+            return typeof result.content === "string" ? result.content : JSON.stringify(result.content);
+        }
+        
+        return JSON.stringify(result, null, 2);
+    }
     
-    const response = await fetch(url, {
+    // No tools available - try simple webhook format
+    logger.info("No MCP tools found, trying webhook format...");
+    
+    const webhookResponse = await fetch(url, {
         method: "POST",
-        headers,
-        body: JSON.stringify(mcpRequest),
+        headers: {
+            ...headers,
+            "Accept": "application/json",
+        },
+        body: JSON.stringify({
+            query,
+            message: query,
+            context: context.map((c) => ({
+                content: c.content,
+                score: c.score,
+                source: c.metadata?.source,
+            })),
+        }),
     });
-
-    // Check if it's an SSE response
-    const contentType = response.headers.get("content-type") || "";
     
-    if (contentType.includes("text/event-stream")) {
-        // Handle SSE response
-        const text = await response.text();
-        const lines = text.split("\n");
-        let result = "";
-        
-        for (const line of lines) {
-            if (line.startsWith("data: ")) {
-                try {
-                    const data = JSON.parse(line.slice(6));
-                    if (data.result?.content) {
-                        result += data.result.content;
-                    } else if (data.content) {
-                        result += typeof data.content === "string" ? data.content : JSON.stringify(data.content);
-                    } else if (data.message) {
-                        result += data.message;
-                    }
-                } catch {
-                    // Not JSON, just append the data
-                    result += line.slice(6);
-                }
-            }
-        }
-        
-        return result || text;
-    }
-
-    if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error");
-        throw new Error(`Agent returned ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    
-    // Handle MCP JSON-RPC response
-    if (data.jsonrpc && data.result) {
-        const mcpResult = data.result;
-        if (mcpResult.content) {
-            if (Array.isArray(mcpResult.content)) {
-                return mcpResult.content.map((c: any) => c.text || c.content || JSON.stringify(c)).join("\n");
-            }
-            return typeof mcpResult.content === "string" ? mcpResult.content : JSON.stringify(mcpResult.content);
-        }
-        return JSON.stringify(mcpResult, null, 2);
+    if (!webhookResponse.ok) {
+        const errorText = await webhookResponse.text().catch(() => "Unknown error");
+        throw new Error(`Agent returned ${webhookResponse.status}: ${errorText}`);
     }
     
-    // Handle various response formats from different platforms
-    const result = 
+    const data = await webhookResponse.json();
+    
+    // Handle various response formats
+    const response = 
         data.response || 
         data.message || 
         data.content || 
@@ -234,16 +279,14 @@ async function callHttpAgent(
         data.output || 
         data.result?.content ||
         data.result ||
-        data.completion ||
         data.answer;
     
-    if (typeof result === "string") {
-        return result;
-    } else if (result) {
-        return typeof result === "object" ? JSON.stringify(result, null, 2) : String(result);
+    if (typeof response === "string") {
+        return response;
+    } else if (response) {
+        return typeof response === "object" ? JSON.stringify(response, null, 2) : String(response);
     }
     
-    // If no known field, return the whole response
     return JSON.stringify(data, null, 2);
 }
 
