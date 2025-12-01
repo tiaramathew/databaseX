@@ -208,8 +208,8 @@ export function WebhookConnectionForm({ onSubmit, onCancel }: WebhookConnectionF
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[70vh]">
-            <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-4">
+            <ScrollArea className="h-[calc(70vh-80px)] pr-4">
+                <div className="space-y-4 pb-2">
                     {/* Platform Selection */}
                     <div className="space-y-2">
                         <Label>Integration Platform</Label>
