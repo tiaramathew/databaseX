@@ -47,6 +47,8 @@ export const addDocumentsSchema = z.object({
         .array(vectorDocumentSchema)
         .min(1, "At least one document is required")
         .max(1000, "Maximum 1000 documents per request"),
+    chunkSize: z.number().int().min(100).max(10000).optional(),
+    chunkOverlap: z.number().int().min(0).max(1000).optional(),
 });
 
 export type AddDocumentsInput = z.infer<typeof addDocumentsSchema>;

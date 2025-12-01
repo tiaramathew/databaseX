@@ -171,11 +171,10 @@ export async function POST(request: Request) {
         return NextResponse.json(validation.error, { status: 400 });
     }
 
-    const { collection, documents, chunkSize, chunkOverlap } = validation.data as any; // Cast to any to access extra fields not in schema yet
-    // Or better, update schema. For now, I'll just extract them if they exist in the body
-    const body = await request.json(); // Re-parse body to get extra fields since validation strips them
-    const customChunkSize = body.chunkSize || 1000;
-    const customChunkOverlap = body.chunkOverlap || 200;
+    const { collection, documents, chunkSize, chunkOverlap } = validation.data;
+
+    const customChunkSize = chunkSize || 1000;
+    const customChunkOverlap = chunkOverlap || 200;
 
     try {
         const connectionConfig = getConnectionConfig(request);
