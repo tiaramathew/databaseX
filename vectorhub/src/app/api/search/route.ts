@@ -6,6 +6,8 @@ import { logger } from "@/lib/logger";
 import type { SearchResult } from "@/lib/db/adapters/base";
 import { generateEmbedding } from "@/lib/embeddings";
 
+const EXPECTED_EMBEDDING_DIMENSIONS = 1536;
+
 // Get connection config from request headers
 function getConnectionConfig(request: Request): ConnectionConfig | null {
     const configHeader = request.headers.get("x-connection-config");
@@ -147,17 +149,54 @@ export async function POST(request: Request) {
 
         if (connectionConfig?.type === "mongodb_atlas") {
             const mongoConfig = connectionConfig.config as MongoDBAtlasConfig;
+            const expectedDimensions = mongoConfig.dimensions || EXPECTED_EMBEDDING_DIMENSIONS;
             let results: SearchResult[];
 
             if (query.vector) {
-                logger.info(`Received vector query. Dimensions: ${query.vector.length}`);
-                results = await searchMongoDBVectors(
-                    mongoConfig,
-                    collection,
-                    query.vector,
-                    query.topK || 10,
-                    query.minScore || 0.5
-                );
+                logger.info(`Received vector query. Dimensions: ${query.vector.length}, Expected: ${expectedDimensions}`);
+                
+                if (query.vector.length !== expectedDimensions) {
+                    logger.warn(`Vector dimension mismatch: received ${query.vector.length}, expected ${expectedDimensions}. Attempting to regenerate embedding from text if available.`);
+                    
+                    if (query.text && query.text.trim()) {
+                        try {
+                            const regeneratedVector = await generateEmbedding(query.text);
+                            logger.info(`Regenerated embedding with correct dimensions: ${regeneratedVector.length}`);
+                            results = await searchMongoDBVectors(
+                                mongoConfig,
+                                collection,
+                                regeneratedVector,
+                                query.topK || 10,
+                                query.minScore || 0.5
+                            );
+                        } catch (embeddingError) {
+                            logger.error("Failed to regenerate embedding", embeddingError);
+                            return NextResponse.json(
+                                {
+                                    code: "DIMENSION_MISMATCH",
+                                    message: `Vector dimension mismatch: your query has ${query.vector.length} dimensions but the index expects ${expectedDimensions} dimensions. This usually happens when using different embedding models. Please use 'text-embedding-3-small' with dimensions=1536 for queries.`,
+                                },
+                                { status: 400 }
+                            );
+                        }
+                    } else {
+                        return NextResponse.json(
+                            {
+                                code: "DIMENSION_MISMATCH",
+                                message: `Vector dimension mismatch: your query has ${query.vector.length} dimensions but the index expects ${expectedDimensions} dimensions. This usually happens when using different embedding models. Please use 'text-embedding-3-small' with dimensions=1536 for queries.`,
+                            },
+                            { status: 400 }
+                        );
+                    }
+                } else {
+                    results = await searchMongoDBVectors(
+                        mongoConfig,
+                        collection,
+                        query.vector,
+                        query.topK || 10,
+                        query.minScore || 0.5
+                    );
+                }
             } else if (query.text && query.text.trim()) {
                 // Generate embedding for text query if vector is not provided
                 try {
