@@ -185,12 +185,17 @@ export async function POST(request: Request) {
         for (const doc of documents) {
             if (!doc.content) continue;
 
-            // Split text into chunks
-            const chunks = splitText(doc.content, customChunkSize, customChunkOverlap);
+            // Split text into chunks only if chunkSize is provided
+            let chunks: string[] = [];
+            if (chunkSize) {
+                chunks = splitText(doc.content, customChunkSize, customChunkOverlap);
+            } else {
+                // If no chunking options provided, treat as single chunk
+                chunks = [doc.content];
+            }
 
-            // If text is short enough to be one chunk, or splitting returned empty
+            // If splitting returned empty (shouldn't happen if content exists, but safe fallback)
             if (chunks.length === 0) {
-                // Fallback for empty/short content handled as single doc
                 chunks.push(doc.content);
             }
 

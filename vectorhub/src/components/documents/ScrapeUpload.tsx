@@ -76,6 +76,11 @@ const supportedFormats = [
     { ext: ".odt/.rtf", label: "OpenDocument/RTF", icon: FileType },
 ];
 
+interface ScrapeUploadProps {
+    onUpload: (documents: ScrapedDocument[]) => Promise<void>;
+    disabled?: boolean;
+}
+
 export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
     const [urls, setUrls] = useState<ScrapeJob[]>([]);
     const [newUrl, setNewUrl] = useState("");
@@ -499,42 +504,89 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                 >
                     <Upload className="mr-2 h-4 w-4" />
                     Upload Scraped
-                    {/* URL Input */}
-                    <div className="space-y-2">
-                        <Label>Add URL to Scrape</Label>
-                        <div className="flex gap-2">
-                            <Input
-                                placeholder="https://example.com/page or https://example.com/document.pdf"
-                                value={newUrl}
-                                onChange={(e) => setNewUrl(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        addUrl();
-                                    }
-                                }}
-                                disabled={disabled}
-                            />
-                            <Button onClick={addUrl} disabled={disabled || !newUrl}>
-                                <Plus className="h-4 w-4" />
-                            </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            Supports web pages and documents (PDF, Excel, Word).{" "}
-                            <a
-                                href="https://docs.firecrawl.dev/features/document-parsing"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline inline-flex items-center gap-1"
-                            >
-                                View supported formats
-                                <LinkIcon className="h-3 w-3" />
-                            </a>
-                        </p>
-                    </div>
+                </Button>
+            </div>
+        </div>
+    );
+}
 
-                    {/* Options */}
-                    <Card>
+function UrlJobCard({ job, onRemove, onRetry }: { job: ScrapeJob; onRemove: (id: string) => void; onRetry: (id: string) => void }) {
+    return (
+        <div className="flex items-center justify-between rounded-lg border bg-card p-3">
+            <div className="flex items-center gap-3 overflow-hidden">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                    {job.status === "completed" ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : job.status === "error" ? (
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                    ) : job.status === "scraping" ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    ) : (
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                    )}
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
+                        {job.title || job.url}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="truncate max-w-[200px]">{job.url}</span>
+                        {job.status === "error" && (
+                            <span className="text-red-500">
+                                - {job.error}
+                            </span>
+                        )}
+                        {job.status === "scraping" && (
+                            <span>- {job.progress}%</span>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <div className="flex items-center gap-1">
+                {job.status === "error" && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onRetry(job.id)}>
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
+                )}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => onRemove(job.id)}
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
+}
+if (e.key === "Enter") {
+    e.preventDefault();
+    addUrl();
+}
+                                }}
+disabled = { disabled }
+    />
+    <Button onClick={addUrl} disabled={disabled || !newUrl}>
+        <Plus className="h-4 w-4" />
+    </Button>
+                        </div >
+    <p className="text-xs text-muted-foreground">
+        Supports web pages and documents (PDF, Excel, Word).{" "}
+        <a
+            href="https://docs.firecrawl.dev/features/document-parsing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline inline-flex items-center gap-1"
+        >
+            View supported formats
+            <LinkIcon className="h-3 w-3" />
+        </a>
+    </p>
+                    </div >
+
+    {/* Options */ }
+    < Card >
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-medium">Scrape Options</CardTitle>
                         </CardHeader>
@@ -591,10 +643,10 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                                 <Switch checked={autoReplace} onCheckedChange={setAutoReplace} />
                             </div>
                         </CardContent>
-                    </Card>
+                    </Card >
 
-                    {/* Supported Formats Info */}
-                    <Card>
+    {/* Supported Formats Info */ }
+    < Card >
                         <CardHeader className="pb-3">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
                                 <FileText className="h-4 w-4" />
@@ -614,86 +666,89 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                                 ))}
                             </div>
                         </CardContent>
-                    </Card>
+                    </Card >
 
-                    {/* URL List */}
-                    {
-                        urls.length > 0 && (
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-sm font-medium">
-                                            URLs to Scrape ({urls.length})
-                                        </CardTitle>
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            {completedCount > 0 && (
-                                                <Badge variant="secondary">
-                                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                                    {completedCount} ready
-                                                </Badge>
-                                            )}
-                                            {totalWords > 0 && (
-                                                <Badge variant="outline">{totalWords.toLocaleString()} words</Badge>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <ScrollArea className="h-[250px]">
-                                        <AnimatePresence>
-                                            <div className="space-y-2">
-                                                {urls.map((job) => (
-                                                    <motion.div
-                                                        key={job.id}
-                                                        initial={{ opacity: 0, y: -10 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        exit={{ opacity: 0, y: -10 }}
-                                                        transition={{ duration: 0.2 }}
-                                                    >
-                                                        <UrlJobCard job={job} onRemove={removeUrl} onRetry={retryScrape} />
-                                                    </motion.div>
-                                                ))}
-                                            </div>
-                                        </AnimatePresence>
-                                    </ScrollArea>
-                                </CardContent>
-                            </Card>
+    {/* URL List */ }
+{
+    urls.length > 0 && (
+        <Card>
+            <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">
+                        URLs to Scrape ({urls.length})
+                    </CardTitle>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {completedCount > 0 && (
+                            <Badge variant="secondary">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                {completedCount} ready
+                            </Badge>
                         )}
-
-                    {/* Empty State */}
-                    {urls.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-                            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                                <Globe className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <h3 className="text-lg font-medium">No URLs added</h3>
-                            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                                Add website URLs or document links to scrape content and upload to your
-                                vector database.
-                            </p>
-                        </div>
-                    )}
-
-                    <div className="flex justify-end">
-                        <Button onClick={handleScrape} disabled={isScraping || urls.length === 0}>
-                            {isScraping ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Scraping...
-                                </>
-                            ) : (
-                                <>
-                                    <RefreshCw className="mr-2 h-4 w-4" />
-                                    Scrape All
-                                </>
-                            )}
-                        </Button>
-                        <Button onClick={handleUpload} disabled={disabled || urls.filter(u => u.status === 'completed').length === 0} className="ml-2">
-                            <Upload className="mr-2 h-4 w-4" />
-                            Upload Scraped
-                        </Button>
+                        {totalWords > 0 && (
+                            <Badge variant="outline">{totalWords.toLocaleString()} words</Badge>
+                        )}
                     </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-[250px]">
+                    <AnimatePresence>
+                        <div className="space-y-2">
+                            {urls.map((job) => (
+                                <motion.div
+                                    key={job.id}
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    <UrlJobCard job={job} onRemove={removeUrl} onRetry={retryScrape} />
+                                </motion.div>
+                            ))}
+                        </div>
+                    </AnimatePresence>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    )
+}
+
+{/* Empty State */ }
+{
+    urls.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
+            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Globe className="h-6 w-6 text-muted-foreground" />
             </div>
+            <h3 className="text-lg font-medium">No URLs added</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                Add website URLs or document links to scrape content and upload to your
+                vector database.
+            </p>
+        </div>
+    )
+}
+
+<div className="flex justify-end">
+    <Button onClick={handleScrape} disabled={isScraping || urls.length === 0}>
+        {isScraping ? (
+            <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Scraping...
+            </>
+        ) : (
+            <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Scrape All
+            </>
+        )}
+    </Button>
+    <Button onClick={handleUpload} disabled={disabled || urls.filter(u => u.status === 'completed').length === 0} className="ml-2">
+        <Upload className="mr-2 h-4 w-4" />
+        Upload Scraped
+    </Button>
+</div>
+            </div >
             );
 }
-            ```
+```
