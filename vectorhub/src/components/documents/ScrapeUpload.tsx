@@ -252,81 +252,405 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
         setUrls((prev) => prev.filter((u) => u.status !== "completed"));
     }, [urls, onUpload]);
 
-    {/* Supported Formats Info */ }
-    <Card>
-        <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Document Parsing
-            </CardTitle>
-            <CardDescription className="text-xs">
-                Firecrawl automatically parses these document formats
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <div className="flex flex-wrap gap-2">
-                {supportedFormats.map((format) => (
-                    <Badge key={format.ext} variant="outline" className="text-xs">
-                        <format.icon className="h-3 w-3 mr-1" />
-                        {format.ext}
-                    </Badge>
-                ))}
-            </div>
-        </CardContent>
-    </Card>
+    const completedCount = urls.filter((u) => u.status === "completed").length;
+    const pendingCount = urls.filter((u) => u.status === "pending" || u.status === "error").length;
+    const totalWords = urls
+        .filter((u) => u.status === "completed")
+        .reduce((acc, u) => acc + (u.wordCount || 0), 0);
 
-    {/* URL List */ }
-    {
-        urls.length > 0 && (
+    return (
+        <div className="space-y-6">
+            {/* URL Input */}
+            <div className="space-y-2">
+                <Label>Add URL to Scrape</Label>
+                <div className="flex gap-2">
+                    <Input
+                        placeholder="https://example.com/page or https://example.com/document.pdf"
+                        value={newUrl}
+                        onChange={(e) => setNewUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                addUrl();
+                            }
+                        }}
+                        disabled={disabled}
+                    />
+                    <Button onClick={addUrl} disabled={disabled || !newUrl}>
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Supports web pages and documents (PDF, Excel, Word).{" "}
+                    <a
+                        href="https://docs.firecrawl.dev/features/document-parsing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                        View supported formats
+                        <LinkIcon className="h-3 w-3" />
+                    </a>
+                </p>
+            </div>
+
+            {/* Options */}
             <Card>
                 <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium">
-                            URLs to Scrape ({urls.length})
-                        </CardTitle>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {completedCount > 0 && (
-                                <Badge variant="secondary">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    {completedCount} ready
-                                </Badge>
-                            )}
-                            {totalWords > 0 && (
-                                <Badge variant="outline">{totalWords.toLocaleString()} words</Badge>
-                            )}
+                    <CardTitle className="text-sm font-medium">Scrape Options</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Scrape Mode</Label>
+                            <Select
+                                value={scrapeDepth}
+                                onValueChange={(v) => setScrapeDepth(v as "single" | "crawl")}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="single">Single Page</SelectItem>
+                                    <SelectItem value="crawl">Crawl Site</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
+                        {scrapeDepth === "crawl" && (
+                            <div className="space-y-2">
+                                <Label>Max Pages</Label>
+                                <Input
+                                    type="number"
+                                    value={maxPages}
+                                    onChange={(e) => setMaxPages(e.target.value)}
+                                    min="1"
+                                    max="100"
+                                />
+                            </div>
+                        )}
                     </div>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-sm">Change Tracking</Label>
+                            <p className="text-xs text-muted-foreground">
+                                Detect changes on re-scrape using Firecrawl
+                            </p>
+                        </div>
+                        <Switch
+                            checked={enableChangeTracking}
+                            onCheckedChange={setEnableChangeTracking}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-sm">Auto-Replace on Update</Label>
+                            <p className="text-xs text-muted-foreground">
+                                Replace existing documents when content changes
+                            </p>
+                        </div>
+                        <Switch checked={autoReplace} onCheckedChange={setAutoReplace} />
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Supported Formats Info */}
+            <Card>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Document Parsing
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                        Firecrawl automatically parses these document formats
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-[250px]">
-                        <AnimatePresence>
-                            <div className="space-y-2">
-                                {urls.map((job) => (
-                                    <motion.div
-                                        key={job.id}
-                                        initial={{ opacity: 0, y: -10 }}
+                    <div className="flex flex-wrap gap-2">
+                        {supportedFormats.map((format) => (
+                            <Badge key={format.ext} variant="outline" className="text-xs">
+                                <format.icon className="h-3 w-3 mr-1" />
+                                {format.ext}
+                            </Badge>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* URL List */}
+            {
+                urls.length > 0 && (
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm font-medium">
+                                    URLs to Scrape ({urls.length})
+                                </CardTitle>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    {completedCount > 0 && (
+                                        <Badge variant="secondary">
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            {completedCount} ready
+                                        </Badge>
+                                    )}
+                                    {totalWords > 0 && (
+                                        <Badge variant="outline">{totalWords.toLocaleString()} words</Badge>
+                                    )}
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-[250px]">
+                                <AnimatePresence>
+                                    <div className="space-y-2">
+                                        {urls.map((job) => (
+                                            <motion.div
+                                                key={job.id}
+                                                initial={{ opacity: 0, y: -10 }}
                     </CardContent>
-                        </Card>
+                                </Card>
             )}
 
-                        {/* Actions */}
-                    </Button>
-                                )}
-                </div>
+                                {/* Actions */}
+                                ```
+        }
 
-                {/* Empty State */}
-                {urls.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
-                        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-                            <Globe className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-medium">No URLs added</h3>
-                        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                            Add website URLs or document links to scrape content and upload to your
-                            vector database.
-                        </p>
-                    </div>
-                )}
-            </div>
-        );
-    }
+                                setIsScraping(false);
+    }, [urls, performScrape]);
+
+    const handleUpload = useCallback(async () => {
+        const completedJobs = urls.filter((u) => u.status === "completed" && u.content);
+
+                                if (completedJobs.length === 0) {
+                                    toast.error("No scraped content to upload", {
+                                        description: "Scrape some URLs first",
+                                    });
+                                return;
+        }
+
+        const documents: ScrapedDocument[] = completedJobs.map((job) => ({
+                                    id: job.id,
+                                url: job.url,
+                                title: job.title || "Untitled",
+                                content: job.content || "",
+                                metadata: {
+                                    source: job.url,
+                                type: job.documentType || "webpage",
+                                wordCount: job.wordCount || 0,
+                                scrapedAt: job.lastScraped || new Date(),
+                                documentType: job.documentType,
+            },
+        }));
+
+                                await onUpload(documents);
+
+        // Clear completed jobs
+        setUrls((prev) => prev.filter((u) => u.status !== "completed"));
+    }, [urls, onUpload]);
+
+    const completedCount = urls.filter((u) => u.status === "completed").length;
+    const pendingCount = urls.filter((u) => u.status === "pending" || u.status === "error").length;
+                                const totalWords = urls
+        .filter((u) => u.status === "completed")
+        .reduce((acc, u) => acc + (u.wordCount || 0), 0);
+
+                                return (
+                                <div className="space-y-6">
+                                    {/* URL Input */}
+                                    <div className="space-y-2">
+                                        <Label>Add URL to Scrape</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="https://example.com/page or https://example.com/document.pdf"
+                                                value={newUrl}
+                                                onChange={(e) => setNewUrl(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault();
+                                                        addUrl();
+                                                    }
+                                                }}
+                                                disabled={disabled}
+                                            />
+                                            <Button onClick={addUrl} disabled={disabled || !newUrl}>
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Supports web pages and documents (PDF, Excel, Word).{" "}
+                                            <a
+                                                href="https://docs.firecrawl.dev/features/document-parsing"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary hover:underline inline-flex items-center gap-1"
+                                            >
+                                                View supported formats
+                                                <LinkIcon className="h-3 w-3" />
+                                            </a>
+                                        </p>
+                                    </div>
+
+                                    {/* Options */}
+                                    <Card>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-sm font-medium">Scrape Options</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Scrape Mode</Label>
+                                                    <Select
+                                                        value={scrapeDepth}
+                                                        onValueChange={(v) => setScrapeDepth(v as "single" | "crawl")}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="single">Single Page</SelectItem>
+                                                            <SelectItem value="crawl">Crawl Site</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                {scrapeDepth === "crawl" && (
+                                                    <div className="space-y-2">
+                                                        <Label>Max Pages</Label>
+                                                        <Input
+                                                            type="number"
+                                                            value={maxPages}
+                                                            onChange={(e) => setMaxPages(e.target.value)}
+                                                            min="1"
+                                                            max="100"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Separator />
+                                            <div className="flex items-center justify-between">
+                                                <div className="space-y-0.5">
+                                                    <Label className="text-sm">Change Tracking</Label>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Detect changes on re-scrape using Firecrawl
+                                                    </p>
+                                                </div>
+                                                <Switch
+                                                    checked={enableChangeTracking}
+                                                    onCheckedChange={setEnableChangeTracking}
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <div className="space-y-0.5">
+                                                    <Label className="text-sm">Auto-Replace on Update</Label>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Replace existing documents when content changes
+                                                    </p>
+                                                </div>
+                                                <Switch checked={autoReplace} onCheckedChange={setAutoReplace} />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Supported Formats Info */}
+                                    <Card>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                                <FileText className="h-4 w-4" />
+                                                Document Parsing
+                                            </CardTitle>
+                                            <CardDescription className="text-xs">
+                                                Firecrawl automatically parses these document formats
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="flex flex-wrap gap-2">
+                                                {supportedFormats.map((format) => (
+                                                    <Badge key={format.ext} variant="outline" className="text-xs">
+                                                        <format.icon className="h-3 w-3 mr-1" />
+                                                        {format.ext}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* URL List */}
+                                    {
+                                        urls.length > 0 && (
+                                            <Card>
+                                                <CardHeader className="pb-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <CardTitle className="text-sm font-medium">
+                                                            URLs to Scrape ({urls.length})
+                                                        </CardTitle>
+                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                            {completedCount > 0 && (
+                                                                <Badge variant="secondary">
+                                                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                                                    {completedCount} ready
+                                                                </Badge>
+                                                            )}
+                                                            {totalWords > 0 && (
+                                                                <Badge variant="outline">{totalWords.toLocaleString()} words</Badge>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <ScrollArea className="h-[250px]">
+                                                        <AnimatePresence>
+                                                            <div className="space-y-2">
+                                                                {urls.map((job) => (
+                                                                    <motion.div
+                                                                        key={job.id}
+                                                                        initial={{ opacity: 0, y: -10 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        exit={{ opacity: 0, y: -10 }}
+                                                                        transition={{ duration: 0.2 }}
+                                                                    >
+                                                                        <UrlJobCard job={job} onRemove={removeUrl} onRetry={retryScrape} />
+                                                                    </motion.div>
+                                                                ))}
+                                                            </div>
+                                                        </AnimatePresence>
+                                                    </ScrollArea>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+
+                                    {/* Empty State */}
+                                    {urls.length === 0 && (
+                                        <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
+                                            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                                                <Globe className="h-6 w-6 text-muted-foreground" />
+                                            </div>
+                                            <h3 className="text-lg font-medium">No URLs added</h3>
+                                            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                                                Add website URLs or document links to scrape content and upload to your
+                                                vector database.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-end">
+                                        <Button onClick={handleScrape} disabled={isScraping || urls.length === 0}>
+                                            {isScraping ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    Scraping...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                                    Scrape All
+                                                </>
+                                            )}
+                                        </Button>
+                                        <Button onClick={handleUpload} disabled={disabled || urls.filter(u => u.status === 'completed').length === 0} className="ml-2">
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Upload Scraped
+                                        </Button>
+                                    </div>
+                                </div>
+                                );
+}
+                                ```
