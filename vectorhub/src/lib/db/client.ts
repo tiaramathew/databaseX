@@ -46,6 +46,10 @@ class MockDbClient {
         return this.adapter.createCollection(config);
     }
 
+    getCollection(name: string): Promise<CollectionInfo> {
+        return this.adapter.getCollection(name);
+    }
+
     deleteCollection(name: string, cascade?: boolean): Promise<void> {
         return this.adapter.deleteCollection(name, cascade);
     }

@@ -104,7 +104,7 @@ export default function ConnectionsPage() {
         const connection = mcpConnections.find((c) => c.id === deleteMcpTarget);
         removeMcpConnection(deleteMcpTarget);
         toast.success("MCP connection removed", {
-            description: `"${connection?.name}" has been removed.",
+            description: `"${connection?.name}" has been removed.`,
         });
         setDeleteMcpTarget(null);
     }, [deleteMcpTarget, mcpConnections, removeMcpConnection]);
@@ -115,7 +115,7 @@ export default function ConnectionsPage() {
         const connection = webhookConnections.find((c) => c.id === deleteWebhookTarget);
         removeWebhookConnection(deleteWebhookTarget);
         toast.success("Webhook removed", {
-            description: `"${connection?.name}" has been removed.",
+            description: `"${connection?.name}" has been removed.`,
         });
         setDeleteWebhookTarget(null);
     }, [deleteWebhookTarget, webhookConnections, removeWebhookConnection]);
@@ -150,7 +150,7 @@ export default function ConnectionsPage() {
             addMcpConnection(newConnection);
             setMcpDialogOpen(false);
             toast.success("MCP connection added", {
-                description: `Successfully registered "${data.name}".",
+                description: `Successfully registered "${data.name}".`,
             });
         },
         [addMcpConnection]
@@ -176,7 +176,7 @@ export default function ConnectionsPage() {
             addWebhookConnection(newConnection);
             setWebhookDialogOpen(false);
             toast.success("Webhook created", {
-                description: `Webhook "${data.name}" is now configured.",
+                description: `Webhook "${data.name}" is now configured.`,
             });
         },
         [addWebhookConnection]

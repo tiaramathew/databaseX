@@ -81,18 +81,18 @@ export function ConfirmDialog({
 
 // Hook for easier confirm dialog usage
 export function useConfirmDialog() {
+    const resolverRef = React.useRef<((value: boolean) => void) | null>(null);
+
     const [state, setState] = React.useState<{
         open: boolean;
         title: string;
         description: string;
         confirmText?: string;
         variant?: "default" | "destructive";
-        onConfirm: () => void | Promise<void>;
     }>({
         open: false,
         title: "",
         description: "",
-        onConfirm: () => {},
     });
 
     const confirm = React.useCallback(
@@ -103,17 +103,27 @@ export function useConfirmDialog() {
             variant?: "default" | "destructive";
         }): Promise<boolean> => {
             return new Promise((resolve) => {
+                resolverRef.current = resolve;
                 setState({
                     open: true,
                     ...options,
-                    onConfirm: () => resolve(true),
                 });
             });
         },
         []
     );
 
+    const handleConfirm = React.useCallback(() => {
+        resolverRef.current?.(true);
+        resolverRef.current = null;
+    }, []);
+
     const handleOpenChange = React.useCallback((open: boolean) => {
+        if (!open) {
+            // Dialog was cancelled/closed without confirm
+            resolverRef.current?.(false);
+            resolverRef.current = null;
+        }
         setState((prev) => ({ ...prev, open }));
     }, []);
 
@@ -126,10 +136,10 @@ export function useConfirmDialog() {
                 description={state.description}
                 confirmText={state.confirmText}
                 variant={state.variant}
-                onConfirm={state.onConfirm}
+                onConfirm={handleConfirm}
             />
         ),
-        [state, handleOpenChange]
+        [state, handleOpenChange, handleConfirm]
     );
 
     return { confirm, Dialog };

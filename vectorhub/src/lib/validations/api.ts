@@ -38,7 +38,7 @@ export const vectorDocumentSchema = z.object({
     id: z.string().optional(),
     content: z.string().min(1, "Content is required"),
     embedding: z.array(z.number()).optional(),
-    metadata: z.record(z.any()).default({}),
+    metadata: z.record(z.any()).default({}).transform((val) => val ?? {}),
 });
 
 export const addDocumentsSchema = z.object({

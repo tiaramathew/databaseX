@@ -1,4 +1,4 @@
-import { McpConnection } from "@/types/connections";
+import { McpConnection, ConnectionStatus } from "@/types/connections";
 import { logger } from "@/lib/logger";
 
 // In-memory MCP connection registry.
@@ -9,6 +9,14 @@ let mcpConnections: McpConnection[] = [];
 export interface CreateMcpConnectionInput {
     name: string;
     endpoint: string;
+    tags?: string[];
+}
+
+export interface UpdateMcpConnectionInput {
+    name?: string;
+    endpoint?: string;
+    status?: ConnectionStatus;
+    lastSync?: Date;
     tags?: string[];
 }
 
@@ -41,6 +49,25 @@ export async function createMcpConnection(
 
 export async function getMcpConnection(id: string): Promise<McpConnection | undefined> {
     return mcpConnections.find((c) => c.id === id);
+}
+
+export async function updateMcpConnection(
+    id: string,
+    updates: UpdateMcpConnectionInput
+): Promise<McpConnection | undefined> {
+    const index = mcpConnections.findIndex((c) => c.id === id);
+    if (index === -1) return undefined;
+
+    const updated = { ...mcpConnections[index], ...updates };
+    mcpConnections = [
+        ...mcpConnections.slice(0, index),
+        updated,
+        ...mcpConnections.slice(index + 1),
+    ];
+
+    logger.info("MCP connection updated", { id, updates: Object.keys(updates) });
+
+    return updated;
 }
 
 export async function deleteMcpConnection(id: string): Promise<boolean> {

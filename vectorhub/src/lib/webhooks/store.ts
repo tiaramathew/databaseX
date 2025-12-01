@@ -1,4 +1,4 @@
-import { WebhookConnection } from "@/types/connections";
+import { WebhookConnection, ConnectionStatus } from "@/types/connections";
 import { logger } from "@/lib/logger";
 
 // In-memory Webhook connection registry.
@@ -11,6 +11,15 @@ export interface CreateWebhookConnectionInput {
     url: string;
     eventTypes: string[];
     secretConfigured: boolean;
+}
+
+export interface UpdateWebhookConnectionInput {
+    name?: string;
+    url?: string;
+    eventTypes?: string[];
+    status?: ConnectionStatus;
+    lastDelivery?: Date;
+    secretConfigured?: boolean;
 }
 
 export async function listWebhookConnections(): Promise<WebhookConnection[]> {
@@ -46,6 +55,25 @@ export async function getWebhookConnection(id: string): Promise<WebhookConnectio
     return webhookConnections.find((c) => c.id === id);
 }
 
+export async function updateWebhookConnection(
+    id: string,
+    updates: UpdateWebhookConnectionInput
+): Promise<WebhookConnection | undefined> {
+    const index = webhookConnections.findIndex((c) => c.id === id);
+    if (index === -1) return undefined;
+
+    const updated = { ...webhookConnections[index], ...updates };
+    webhookConnections = [
+        ...webhookConnections.slice(0, index),
+        updated,
+        ...webhookConnections.slice(index + 1),
+    ];
+
+    logger.info("Webhook connection updated", { id, updates: Object.keys(updates) });
+
+    return updated;
+}
+
 export async function deleteWebhookConnection(id: string): Promise<boolean> {
     const before = webhookConnections.length;
     webhookConnections = webhookConnections.filter((c) => c.id !== id);
@@ -56,4 +84,10 @@ export async function deleteWebhookConnection(id: string): Promise<boolean> {
     }
 
     return deleted;
+}
+
+// Get webhook secret from environment (for demonstration)
+// In production, each webhook should have its own stored secret
+export function getWebhookSecret(): string | undefined {
+    return process.env.WEBHOOK_SECRET;
 }

@@ -6,6 +6,7 @@ import {
     validateRequestBody,
 } from "@/lib/validations/api";
 import { logger } from "@/lib/logger";
+import type { VectorDocument } from "@/lib/db/adapters/base";
 
 export async function POST(request: Request) {
     const validation = await validateRequestBody(request, addDocumentsSchema);
@@ -17,7 +18,13 @@ export async function POST(request: Request) {
     const { collection, documents } = validation.data;
 
     try {
-        const ids = await mockDbClient.addDocuments(collection, documents);
+        // Ensure all documents have metadata defined
+        const normalizedDocs: VectorDocument[] = documents.map((doc) => ({
+            ...doc,
+            metadata: doc.metadata ?? {},
+        }));
+
+        const ids = await mockDbClient.addDocuments(collection, normalizedDocs);
         return NextResponse.json({ ids }, { status: 201 });
     } catch (error) {
         logger.error("POST /api/documents failed", error, { collection, count: documents.length });
