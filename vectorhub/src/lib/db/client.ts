@@ -96,6 +96,10 @@ class VectorDBClient {
         return this.getActiveAdapter().createCollection(config);
     }
 
+    getCollection(name: string): Promise<CollectionInfo> {
+        return this.getActiveAdapter().getCollection(name);
+    }
+
     deleteCollection(name: string, cascade?: boolean): Promise<void> {
         return this.getActiveAdapter().deleteCollection(name, cascade);
     }

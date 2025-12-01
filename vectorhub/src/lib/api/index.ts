@@ -28,6 +28,13 @@ export {
     type SearchOptions,
 } from "./search";
 
+// RAG API
+export {
+    ragQueryApi,
+    type RAGQueryInput,
+    type RAGQueryResult,
+} from "./rag";
+
 // MCP Connections API
 export {
     listMcpConnectionsApi,
