@@ -1,7 +1,125 @@
 import { NextResponse } from "next/server";
-import { mockDbClient } from "@/lib/db/client";
+import { MongoClient } from "mongodb";
+import { ConnectionConfig, MongoDBAtlasConfig } from "@/types/connections";
 import { searchQuerySchema, validateRequestBody } from "@/lib/validations/api";
 import { logger } from "@/lib/logger";
+import type { SearchResult } from "@/lib/db/adapters/base";
+
+// Get connection config from request headers
+function getConnectionConfig(request: Request): ConnectionConfig | null {
+    const configHeader = request.headers.get("x-connection-config");
+    if (!configHeader) {
+        return null;
+    }
+    try {
+        return JSON.parse(configHeader) as ConnectionConfig;
+    } catch {
+        return null;
+    }
+}
+
+// Vector search in MongoDB Atlas
+async function searchMongoDBVectors(
+    config: MongoDBAtlasConfig,
+    collection: string,
+    vector: number[],
+    topK: number,
+    minScore: number
+): Promise<SearchResult[]> {
+    const client = new MongoClient(config.connectionString);
+
+    try {
+        await client.connect();
+        const db = client.db(config.database);
+        const col = db.collection(collection);
+
+        // Use MongoDB Atlas Vector Search
+        const pipeline = [
+            {
+                $vectorSearch: {
+                    index: config.vectorSearchIndexName || "vector_index",
+                    path: config.embeddingField || "embedding",
+                    queryVector: vector,
+                    numCandidates: topK * 10,
+                    limit: topK,
+                },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    content: 1,
+                    metadata: 1,
+                    score: { $meta: "vectorSearchScore" },
+                },
+            },
+            {
+                $match: {
+                    score: { $gte: minScore },
+                },
+            },
+        ];
+
+        const results = await col.aggregate(pipeline).toArray();
+
+        return results.map((doc) => ({
+            id: doc._id.toHexString(),
+            score: doc.score,
+            content: doc.content,
+            metadata: doc.metadata,
+        }));
+    } finally {
+        await client.close();
+    }
+}
+
+// Text search in MongoDB (fallback when no vector provided)
+async function searchMongoDBText(
+    config: MongoDBAtlasConfig,
+    collection: string,
+    text: string,
+    topK: number
+): Promise<SearchResult[]> {
+    const client = new MongoClient(config.connectionString);
+
+    try {
+        await client.connect();
+        const db = client.db(config.database);
+        const col = db.collection(collection);
+
+        // Try text search first, fall back to regex
+        let results;
+        try {
+            results = await col
+                .find({ $text: { $search: text } })
+                .project({ score: { $meta: "textScore" }, content: 1, metadata: 1 })
+                .sort({ score: { $meta: "textScore" } })
+                .limit(topK)
+                .toArray();
+        } catch {
+            // Fallback to regex search if text index doesn't exist
+            const regex = new RegExp(text.split(/\s+/).join("|"), "i");
+            results = await col
+                .find({
+                    $or: [
+                        { content: { $regex: regex } },
+                        { "metadata.source": { $regex: regex } },
+                        { "metadata.title": { $regex: regex } },
+                    ],
+                })
+                .limit(topK)
+                .toArray();
+        }
+
+        return results.map((doc, i) => ({
+            id: doc._id.toHexString(),
+            score: doc.score || 1 - i * 0.1,
+            content: doc.content,
+            metadata: doc.metadata,
+        }));
+    } finally {
+        await client.close();
+    }
+}
 
 export async function POST(request: Request) {
     const validation = await validateRequestBody(request, searchQuerySchema);
@@ -24,13 +142,43 @@ export async function POST(request: Request) {
     }
 
     try {
-        const results = await mockDbClient.search(collection, query);
+        const connectionConfig = getConnectionConfig(request);
 
-        return NextResponse.json(results);
+        if (connectionConfig?.type === "mongodb_atlas") {
+            const mongoConfig = connectionConfig.config as MongoDBAtlasConfig;
+            let results: SearchResult[];
+
+            if (query.vector) {
+                results = await searchMongoDBVectors(
+                    mongoConfig,
+                    collection,
+                    query.vector,
+                    query.topK || 10,
+                    query.minScore || 0.5
+                );
+            } else if (query.text) {
+                results = await searchMongoDBText(
+                    mongoConfig,
+                    collection,
+                    query.text,
+                    query.topK || 10
+                );
+            } else {
+                results = [];
+            }
+
+            return NextResponse.json(results);
+        }
+
+        // For other types or no config, return empty results
+        return NextResponse.json([]);
     } catch (error) {
-        logger.error("POST /api/search failed", error, { collection, hasVector: !!query.vector, hasText: !!query.text });
+        logger.error("POST /api/search failed", error, {
+            collection,
+            hasVector: !!query.vector,
+            hasText: !!query.text,
+        });
 
-        // Check for collection not found
         if (
             error instanceof Error &&
             error.message.toLowerCase().includes("not found")
@@ -47,7 +195,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
             {
                 code: "INTERNAL_ERROR",
-                message: "Failed to execute search",
+                message: error instanceof Error ? error.message : "Failed to execute search",
             },
             { status: 500 }
         );

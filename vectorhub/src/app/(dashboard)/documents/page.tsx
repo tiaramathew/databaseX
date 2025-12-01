@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, Search, RefreshCw, Loader2, Filter, Trash2 } from "lucide-react";
+import { Upload, FileText, Search, RefreshCw, Loader2, Filter, Database } from "lucide-react";
 import Link from "next/link";
 import {
     Select,
@@ -18,6 +18,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { listDocumentsApi, deleteDocumentsApi } from "@/lib/api/documents";
+import { listCollectionsApi } from "@/lib/api/collections";
+import type { VectorDocument } from "@/lib/db/adapters/base";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -33,54 +36,179 @@ const itemVariants = {
 };
 
 export default function DocumentsPage() {
-    // Access store state and actions separately
-    const documents = useStore((state) => state.documents);
-    const collections = useStore((state) => state.collections);
-    const removeDocument = useStore((state) => state.removeDocument);
+    // Access store state and actions
+    const connections = useStore((state) => state.connections);
+    const activeConnectionId = useStore((state) => state.activeConnectionId);
+    const setActiveConnection = useStore((state) => state.setActiveConnection);
+    const getConnection = useStore((state) => state.getConnection);
 
+    const activeConnection = activeConnectionId ? getConnection(activeConnectionId) : null;
+
+    const [documents, setDocuments] = useState<VectorDocument[]>([]);
+    const [collections, setCollections] = useState<string[]>([]);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterCollection, setFilterCollection] = useState<string>("all");
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Auto-select first connection if none selected
+    useEffect(() => {
+        if (!activeConnectionId && connections.length > 0) {
+            setActiveConnection(connections[0].id);
+        }
+    }, [activeConnectionId, connections, setActiveConnection]);
+
+    // Load collections and documents when connection changes
+    useEffect(() => {
+        let mounted = true;
+
+        const loadData = async () => {
+            if (!activeConnection) {
+                setCollections([]);
+                setDocuments([]);
+                return;
+            }
+
+            setIsLoading(true);
+            try {
+                // Fetch collections
+                const collectionList = await listCollectionsApi(activeConnection);
+                if (!mounted) return;
+
+                const collectionNames = collectionList.map((c) => c.name);
+                setCollections(collectionNames);
+
+                // Fetch documents from all collections
+                const allDocs: VectorDocument[] = [];
+                for (const colName of collectionNames.slice(0, 5)) { // Limit to first 5 collections
+                    try {
+                        const docs = await listDocumentsApi(colName, activeConnection, 50);
+                        docs.forEach((doc) => {
+                            doc.metadata = {
+                                ...doc.metadata,
+                                collectionName: colName,
+                            };
+                        });
+                        allDocs.push(...docs);
+                    } catch (err) {
+                        console.warn(`Failed to fetch documents from ${colName}:`, err);
+                    }
+                }
+
+                if (mounted) {
+                    setDocuments(allDocs);
+                }
+            } catch (error) {
+                console.error("Failed to load data:", error);
+                if (mounted) {
+                    toast.error("Failed to load documents", {
+                        description: error instanceof Error ? error.message : "Unknown error",
+                    });
+                }
+            } finally {
+                if (mounted) {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        loadData();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeConnection]);
 
     // Filter documents based on search and collection filter
     const filteredDocuments = documents.filter((doc) => {
-        const matchesSearch = searchQuery === "" || 
-            doc.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        const matchesSearch =
+            searchQuery === "" ||
+            doc.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (doc.metadata?.source as string)?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (doc.metadata?.title as string)?.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        const matchesCollection = filterCollection === "all" || 
-            doc.metadata?.collectionName === filterCollection;
-        
+
+        const matchesCollection =
+            filterCollection === "all" || doc.metadata?.collectionName === filterCollection;
+
         return matchesSearch && matchesCollection;
     });
 
-    // Get unique collections from documents
-    const documentCollections = Array.from(
-        new Set(documents.map((d) => d.metadata?.collectionName as string).filter(Boolean))
-    );
-
     const handleRefresh = useCallback(async () => {
-        setIsRefreshing(true);
-        // Simulate refresh - in a real app this would fetch from API
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        toast.success("Documents refreshed", {
-            description: `${documents.length} documents in sync.`,
-        });
-        setIsRefreshing(false);
-    }, [documents.length]);
+        if (!activeConnection) {
+            toast.error("No connection selected");
+            return;
+        }
 
-    const handleDeleteConfirm = useCallback(() => {
-        if (!deleteTarget) return;
+        setIsLoading(true);
+        const toastId = toast.loading("Refreshing documents...");
+
+        try {
+            const collectionList = await listCollectionsApi(activeConnection);
+            const collectionNames = collectionList.map((c) => c.name);
+            setCollections(collectionNames);
+
+            const allDocs: VectorDocument[] = [];
+            for (const colName of collectionNames.slice(0, 5)) {
+                try {
+                    const docs = await listDocumentsApi(colName, activeConnection, 50);
+                    docs.forEach((doc) => {
+                        doc.metadata = {
+                            ...doc.metadata,
+                            collectionName: colName,
+                        };
+                    });
+                    allDocs.push(...docs);
+                } catch (err) {
+                    console.warn(`Failed to fetch documents from ${colName}:`, err);
+                }
+            }
+
+            setDocuments(allDocs);
+            toast.success("Documents refreshed", {
+                id: toastId,
+                description: `${allDocs.length} documents loaded.`,
+            });
+        } catch (error) {
+            toast.error("Failed to refresh", {
+                id: toastId,
+                description: error instanceof Error ? error.message : "Unknown error",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [activeConnection]);
+
+    const handleDeleteConfirm = useCallback(async () => {
+        if (!deleteTarget || !activeConnection) return;
 
         const doc = documents.find((d) => d.id === deleteTarget);
-        removeDocument(deleteTarget);
+        const collection = doc?.metadata?.collectionName as string;
+
+        if (!collection) {
+            toast.error("Cannot delete document", {
+                description: "Collection name not found",
+            });
+            setDeleteTarget(null);
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            await deleteDocumentsApi(collection, [deleteTarget], activeConnection);
+            setDocuments((prev) => prev.filter((d) => d.id !== deleteTarget));
         toast.success("Document deleted", {
             description: `"${doc?.metadata?.source || "Document"}" has been removed.`,
         });
+        } catch (error) {
+            toast.error("Failed to delete document", {
+                description: error instanceof Error ? error.message : "Unknown error",
+            });
+        } finally {
+            setIsDeleting(false);
         setDeleteTarget(null);
-    }, [deleteTarget, documents, removeDocument]);
+        }
+    }, [deleteTarget, documents, activeConnection]);
 
     return (
         <>
@@ -90,10 +218,7 @@ export default function DocumentsPage() {
                 initial="hidden"
                 animate="visible"
             >
-                <motion.div
-                    variants={itemVariants}
-                    className="flex items-center justify-between"
-                >
+                <motion.div variants={itemVariants} className="flex items-center justify-between">
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Documents</h2>
                         <p className="text-muted-foreground">
@@ -101,20 +226,41 @@ export default function DocumentsPage() {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-                            {isRefreshing ? (
+                        <Select
+                            value={activeConnectionId || ""}
+                            onValueChange={(value) => setActiveConnection(value || null)}
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <Database className="mr-2 h-4 w-4" />
+                                <SelectValue placeholder="Select connection" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {connections.map((conn) => (
+                                    <SelectItem key={conn.id} value={conn.id}>
+                                        {conn.name}
+                                    </SelectItem>
+                                ))}
+                                {connections.length === 0 && (
+                                    <div className="p-2 text-sm text-muted-foreground text-center">
+                                        No connections
+                                    </div>
+                                )}
+                            </SelectContent>
+                        </Select>
+                        <Button variant="outline" onClick={handleRefresh} disabled={isLoading || !activeConnection}>
+                            {isLoading ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
                                 <RefreshCw className="mr-2 h-4 w-4" />
                             )}
                             Refresh
                         </Button>
-                        <Link href="/upload">
-                            <Button>
-                                <Upload className="mr-2 h-4 w-4" />
-                                Upload New
-                            </Button>
-                        </Link>
+                    <Link href="/upload">
+                        <Button>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload New
+                        </Button>
+                    </Link>
                     </div>
                 </motion.div>
 
@@ -138,7 +284,7 @@ export default function DocumentsPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Collections</SelectItem>
-                                    {documentCollections.map((col) => (
+                                    {collections.map((col) => (
                                         <SelectItem key={col} value={col}>
                                             {col}
                                         </SelectItem>
@@ -160,12 +306,36 @@ export default function DocumentsPage() {
                 )}
 
                 <motion.div variants={itemVariants}>
-                    {documents.length > 0 ? (
+                    {isLoading ? (
+                        <div className="flex h-[450px] flex-col items-center justify-center rounded-lg border border-dashed text-center">
+                            <Loader2 className="h-12 w-12 text-muted-foreground mb-4 animate-spin" />
+                            <h3 className="text-lg font-semibold">Loading documents...</h3>
+                            <p className="text-sm text-muted-foreground max-w-sm">
+                                Fetching documents from your connected database.
+                            </p>
+                        </div>
+                    ) : !activeConnection ? (
+                        <div className="flex h-[450px] flex-col items-center justify-center rounded-lg border border-dashed text-center">
+                            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                                <Database className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-lg font-semibold">No connection selected</h3>
+                            <p className="mb-6 text-sm text-muted-foreground max-w-sm">
+                                Select a connection or add a new one to view documents.
+                            </p>
+                            <Link href="/connections">
+                                <Button>
+                                    <Database className="mr-2 h-4 w-4" />
+                                    Manage Connections
+                                </Button>
+                            </Link>
+                        </div>
+                    ) : documents.length > 0 ? (
                         filteredDocuments.length > 0 ? (
-                            <DocumentList
+                        <DocumentList
                                 documents={filteredDocuments}
-                                onDelete={(id) => setDeleteTarget(id)}
-                            />
+                            onDelete={(id) => setDeleteTarget(id)}
+                        />
                         ) : (
                             <div className="flex h-[300px] flex-col items-center justify-center rounded-lg border border-dashed text-center">
                                 <Search className="h-12 w-12 text-muted-foreground mb-4" />
@@ -213,6 +383,7 @@ export default function DocumentsPage() {
                 confirmText="Delete"
                 variant="destructive"
                 onConfirm={handleDeleteConfirm}
+                isLoading={isDeleting}
             />
         </>
     );

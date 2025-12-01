@@ -234,7 +234,8 @@ export default function UploadPage() {
             }));
 
             try {
-                await addDocumentsApi(selectedCollection, docs);
+                const connection = connections.find((c) => c.id === selectedConnection);
+                await addDocumentsApi(selectedCollection, docs, connection);
                 docs.forEach((doc) => addDocument(doc));
                 await syncCollectionsFromDb();
 
@@ -244,10 +245,10 @@ export default function UploadPage() {
                     id: toastId,
                     description: `Documents added to "${selectedCollection}".`,
                 });
-            } catch {
+            } catch (error) {
                 toast.error("Upload failed", {
                     id: toastId,
-                    description: "Could not upload files. Please try again.",
+                    description: error instanceof Error ? error.message : "Could not upload files. Please try again.",
                 });
             } finally {
                 setIsUploading(false);
@@ -260,6 +261,7 @@ export default function UploadPage() {
             addDocument,
             syncCollectionsFromDb,
             syncToExternalConnections,
+            connections,
         ]
     );
 
@@ -284,7 +286,8 @@ export default function UploadPage() {
             };
 
             try {
-                await addDocumentsApi(selectedCollection, [doc]);
+                const connection = connections.find((c) => c.id === selectedConnection);
+                await addDocumentsApi(selectedCollection, [doc], connection);
                 addDocument(doc);
                 await syncCollectionsFromDb();
 
@@ -294,10 +297,10 @@ export default function UploadPage() {
                     id: toastId,
                     description: `"${title}" added to "${selectedCollection}".`,
                 });
-            } catch {
+            } catch (error) {
                 toast.error("Upload failed", {
                     id: toastId,
-                    description: "Could not upload text. Please try again.",
+                    description: error instanceof Error ? error.message : "Could not upload text. Please try again.",
                 });
             } finally {
                 setIsUploading(false);
@@ -310,6 +313,7 @@ export default function UploadPage() {
             addDocument,
             syncCollectionsFromDb,
             syncToExternalConnections,
+            connections,
         ]
     );
 
@@ -337,7 +341,8 @@ export default function UploadPage() {
             }));
 
             try {
-                await addDocumentsApi(selectedCollection, docs);
+                const connection = connections.find((c) => c.id === selectedConnection);
+                await addDocumentsApi(selectedCollection, docs, connection);
                 docs.forEach((doc) => addDocument(doc));
                 await syncCollectionsFromDb();
 
@@ -347,10 +352,10 @@ export default function UploadPage() {
                     id: toastId,
                     description: `Scraped content added to "${selectedCollection}".`,
                 });
-            } catch {
+            } catch (error) {
                 toast.error("Upload failed", {
                     id: toastId,
-                    description: "Could not upload scraped content. Please try again.",
+                    description: error instanceof Error ? error.message : "Could not upload scraped content. Please try again.",
                 });
             } finally {
                 setIsUploading(false);
@@ -363,6 +368,7 @@ export default function UploadPage() {
             addDocument,
             syncCollectionsFromDb,
             syncToExternalConnections,
+            connections,
         ]
     );
 
