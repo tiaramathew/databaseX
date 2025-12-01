@@ -14,6 +14,7 @@ import {
     Zap,
     LogOut,
     User,
+    Key,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,7 @@ const navItems = [
 ];
 
 const bottomNavItems = [
+    { href: "/integrations", icon: Key, label: "Integrations" },
     { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

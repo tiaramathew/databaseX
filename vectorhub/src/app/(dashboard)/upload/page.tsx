@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useStore } from "@/store";
 import { UploadZone } from "@/components/documents/UploadZone";
 import { TextInputUpload } from "@/components/documents/TextInputUpload";
+import { ScrapeUpload, ScrapedDocument } from "@/components/documents/ScrapeUpload";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Select,
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileText, AlertCircle, Webhook, Cpu, Database, CheckCircle2 } from "lucide-react";
+import { Upload, FileText, AlertCircle, Webhook, Cpu, Database, CheckCircle2, Globe } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import type { VectorDocument } from "@/lib/db/adapters/base";
@@ -253,6 +254,59 @@ export default function UploadPage() {
         ]
     );
 
+    const handleScrapeUpload = useCallback(
+        async (scrapedDocs: ScrapedDocument[]) => {
+            if (!ensureTargetsSelected()) return;
+
+            setIsUploading(true);
+            const toastId = toast.loading(`Uploading ${scrapedDocs.length} scraped document(s)...`);
+
+            const docs: VectorDocument[] = scrapedDocs.map((doc) => ({
+                id: doc.id,
+                content: doc.content,
+                metadata: {
+                    source: doc.url,
+                    title: doc.title,
+                    type: doc.metadata.type,
+                    wordCount: doc.metadata.wordCount,
+                    scrapedAt: doc.metadata.scrapedAt,
+                    documentType: doc.metadata.documentType,
+                    created_at: new Date(),
+                    connectionId: selectedConnection,
+                    collectionName: selectedCollection,
+                },
+            }));
+
+            try {
+                await addDocumentsApi(selectedCollection, docs);
+                docs.forEach((doc) => addDocument(doc));
+                await syncCollectionsFromDb();
+
+                await syncToExternalConnections(docs, selectedCollection);
+
+                toast.success(`${scrapedDocs.length} document(s) uploaded`, {
+                    id: toastId,
+                    description: `Scraped content added to "${selectedCollection}".`,
+                });
+            } catch {
+                toast.error("Upload failed", {
+                    id: toastId,
+                    description: "Could not upload scraped content. Please try again.",
+                });
+            } finally {
+                setIsUploading(false);
+            }
+        },
+        [
+            ensureTargetsSelected,
+            selectedConnection,
+            selectedCollection,
+            addDocument,
+            syncCollectionsFromDb,
+            syncToExternalConnections,
+        ]
+    );
+
     const hasTargetsSelected = selectedConnection && selectedCollection;
 
     return (
@@ -436,7 +490,7 @@ export default function UploadPage() {
 
             <motion.div variants={itemVariants}>
                 <Tabs defaultValue="files" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="files" className="flex items-center gap-2">
                             <Upload className="h-4 w-4" />
                             File Upload
@@ -444,6 +498,10 @@ export default function UploadPage() {
                         <TabsTrigger value="text" className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
                             Text Input
+                        </TabsTrigger>
+                        <TabsTrigger value="scrape" className="flex items-center gap-2">
+                            <Globe className="h-4 w-4" />
+                            Scrape & Crawl
                         </TabsTrigger>
                     </TabsList>
                     <TabsContent value="files" className="mt-4">
@@ -461,6 +519,16 @@ export default function UploadPage() {
                             <CardContent className="pt-6">
                                 <TextInputUpload
                                     onUpload={handleTextUpload}
+                                    disabled={!hasTargetsSelected || isUploading}
+                                />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="scrape" className="mt-4">
+                        <Card>
+                            <CardContent className="pt-6">
+                                <ScrapeUpload
+                                    onUpload={handleScrapeUpload}
                                     disabled={!hasTargetsSelected || isUploading}
                                 />
                             </CardContent>
