@@ -156,7 +156,7 @@ export default function ConnectionsPage() {
                                 Add Connection
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Add Connection</DialogTitle>
                                 <DialogDescription>
