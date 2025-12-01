@@ -41,11 +41,20 @@ import {
     Clock,
     Zap,
     ExternalLink,
+    Settings,
+    ChevronDown,
+    ChevronUp,
 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
 interface ScrapeUploadProps {
-    onUpload: (documents: ScrapedDocument[]) => Promise<void>;
+    onUpload: (documents: ScrapedDocument[], options?: { chunkSize: number; chunkOverlap: number }) => Promise<void>;
     disabled?: boolean;
 }
 
@@ -93,6 +102,13 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
     const [autoReplace, setAutoReplace] = useState(true);
     const [scrapeDepth, setScrapeDepth] = useState<"single" | "crawl">("single");
     const [maxPages, setMaxPages] = useState("10");
+
+    // Advanced Options
+    const [showAdvanced, setShowAdvanced] = useState(false);
+    const [scrapeFormat, setScrapeFormat] = useState<"markdown" | "html" | "rawHtml">("markdown");
+    const [onlyMainContent, setOnlyMainContent] = useState(true);
+    const [chunkSize, setChunkSize] = useState([1000]);
+    const [chunkOverlap, setChunkOverlap] = useState([200]);
 
     const isValidUrl = (url: string) => {
         try {
@@ -155,7 +171,11 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
             const response = await fetch("/api/scrape", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url: job.url }),
+                body: JSON.stringify({
+                    url: job.url,
+                    formats: [scrapeFormat],
+                    onlyMainContent: onlyMainContent
+                }),
             });
 
             const result = await response.json();
@@ -227,7 +247,7 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
         }
 
         setIsScraping(false);
-    }, [urls, enableChangeTracking]);
+    }, [urls, enableChangeTracking, scrapeFormat, onlyMainContent]);
 
     const handleUpload = useCallback(async () => {
         const completedJobs = urls.filter((u) => u.status === "completed" && u.content);
@@ -253,7 +273,10 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
             },
         }));
 
-        await onUpload(documents);
+        await onUpload(documents, {
+            chunkSize: chunkSize[0],
+            chunkOverlap: chunkOverlap[0]
+        });
 
         // Clear completed jobs
         setUrls((prev) => prev.filter((u) => u.status !== "completed"));
@@ -360,6 +383,118 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Advanced Options */}
+            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                <Card>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                <Settings className="h-4 w-4" />
+                                Advanced Options
+                            </CardTitle>
+                            <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="w-9 p-0">
+                                    {showAdvanced ? (
+                                        <ChevronUp className="h-4 w-4" />
+                                    ) : (
+                                        <ChevronDown className="h-4 w-4" />
+                                    )}
+                                    <span className="sr-only">Toggle</span>
+                                </Button>
+                            </CollapsibleTrigger>
+                        </div>
+                        <CardDescription className="text-xs">
+                            Configure parsing formats and chunking strategy
+                        </CardDescription>
+                    </CardHeader>
+                    <CollapsibleContent>
+                        <CardContent className="space-y-6 pt-0">
+                            <Separator className="mb-4" />
+
+                            {/* Parsing Options */}
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-semibold uppercase text-muted-foreground">Parsing</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Output Format</Label>
+                                        <Select
+                                            value={scrapeFormat}
+                                            onValueChange={(v) => setScrapeFormat(v as any)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="markdown">Markdown (Best for LLMs)</SelectItem>
+                                                <SelectItem value="html">Clean HTML</SelectItem>
+                                                <SelectItem value="rawHtml">Raw HTML</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex items-center justify-between space-y-0 pt-8">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-sm">Only Main Content</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Skip navs, footers, ads
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={onlyMainContent}
+                                            onCheckedChange={setOnlyMainContent}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* Chunking Options */}
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-semibold uppercase text-muted-foreground">Chunking</h4>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Chunk Size</Label>
+                                            <span className="text-xs font-medium tabular-nums">
+                                                {chunkSize[0]} chars
+                                            </span>
+                                        </div>
+                                        <Slider
+                                            value={chunkSize}
+                                            onValueChange={setChunkSize}
+                                            min={100}
+                                            max={4000}
+                                            step={100}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Target size for each text segment
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Chunk Overlap</Label>
+                                            <span className="text-xs font-medium tabular-nums">
+                                                {chunkOverlap[0]} chars
+                                            </span>
+                                        </div>
+                                        <Slider
+                                            value={chunkOverlap}
+                                            onValueChange={setChunkOverlap}
+                                            min={0}
+                                            max={500}
+                                            step={10}
+                                        />
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Overlap between chunks to preserve context
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </CollapsibleContent>
+                </Card>
+            </Collapsible>
 
             {/* Supported Formats Info */}
             <Card>

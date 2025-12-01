@@ -9,6 +9,7 @@ import {
 import { logger } from "@/lib/logger";
 import type { VectorDocument } from "@/lib/db/adapters/base";
 import { generateEmbedding } from "@/lib/embeddings";
+import { splitText } from "@/lib/chunking";
 
 // Get connection config from request headers
 function getConnectionConfig(request: Request): ConnectionConfig | null {
@@ -170,39 +171,68 @@ export async function POST(request: Request) {
         return NextResponse.json(validation.error, { status: 400 });
     }
 
-    const { collection, documents } = validation.data;
+    const { collection, documents, chunkSize, chunkOverlap } = validation.data as any; // Cast to any to access extra fields not in schema yet
+    // Or better, update schema. For now, I'll just extract them if they exist in the body
+    const body = await request.json(); // Re-parse body to get extra fields since validation strips them
+    const customChunkSize = body.chunkSize || 1000;
+    const customChunkOverlap = body.chunkOverlap || 200;
 
     try {
         const connectionConfig = getConnectionConfig(request);
 
-        // Ensure all documents have metadata defined and generate embeddings if missing
-        const normalizedDocs: VectorDocument[] = await Promise.all(
-            documents.map(async (doc) => {
-                let embedding = doc.embedding;
-                if (!embedding && doc.content) {
+        // Process documents: Chunking -> Embedding
+        const processedDocs: VectorDocument[] = [];
+
+        for (const doc of documents) {
+            if (!doc.content) continue;
+
+            // Split text into chunks
+            const chunks = splitText(doc.content, customChunkSize, customChunkOverlap);
+
+            // If text is short enough to be one chunk, or splitting returned empty
+            if (chunks.length === 0) {
+                // Fallback for empty/short content handled as single doc
+                chunks.push(doc.content);
+            }
+
+            // Process each chunk
+            for (let i = 0; i < chunks.length; i++) {
+                const chunkContent = chunks[i];
+                let embedding = doc.embedding; // Use provided embedding if exists (rare for chunks)
+
+                // Generate embedding for the chunk
+                if (!embedding) {
                     try {
-                        embedding = await generateEmbedding(doc.content);
+                        embedding = await generateEmbedding(chunkContent);
                     } catch (err) {
-                        logger.warn("Failed to generate embedding for doc", { id: doc.id, error: err });
+                        logger.warn("Failed to generate embedding for chunk", { docId: doc.id, chunkIndex: i, error: err });
+                        continue; // Skip failed chunks
                     }
                 }
 
-                return {
-                    ...doc,
+                processedDocs.push({
+                    id: chunks.length > 1 ? `${doc.id || crypto.randomUUID()}_chunk_${i}` : (doc.id || crypto.randomUUID()),
+                    content: chunkContent,
                     embedding,
-                    metadata: doc.metadata ?? {},
-                };
-            })
-        );
+                    metadata: {
+                        ...(doc.metadata ?? {}),
+                        parentDocumentId: doc.id,
+                        chunkIndex: i,
+                        totalChunks: chunks.length,
+                        isChunk: chunks.length > 1,
+                    },
+                });
+            }
+        }
 
         if (connectionConfig?.type === "mongodb_atlas") {
             const mongoConfig = connectionConfig.config as MongoDBAtlasConfig;
-            const ids = await addMongoDBDocuments(mongoConfig, collection, normalizedDocs);
+            const ids = await addMongoDBDocuments(mongoConfig, collection, processedDocs);
             return NextResponse.json({ ids }, { status: 201 });
         }
 
         // For other types or no config, return mock IDs
-        const ids = normalizedDocs.map((doc) => doc.id || crypto.randomUUID());
+        const ids = processedDocs.map((doc) => doc.id || crypto.randomUUID());
         return NextResponse.json({ ids }, { status: 201 });
     } catch (error) {
         logger.error("POST /api/documents failed", error, { collection, count: documents.length });

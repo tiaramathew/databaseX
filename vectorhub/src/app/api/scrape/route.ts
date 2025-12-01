@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { url } = body;
+        const { url, formats, onlyMainContent } = body;
 
         if (!url) {
             return NextResponse.json(
@@ -14,8 +14,8 @@ export async function POST(request: Request) {
             );
         }
 
-        logger.info("Scraping URL", { url });
-        const result = await firecrawl.scrapeUrl(url);
+        logger.info("Scraping URL", { url, formats, onlyMainContent });
+        const result = await firecrawl.scrapeUrl(url, { formats, onlyMainContent });
 
         if (!result.success) {
             logger.error("Firecrawl scrape failed", { url, error: result.error });

@@ -10,6 +10,11 @@ export interface FirecrawlScrapeResponse {
     error?: string;
 }
 
+export interface ScrapeOptions {
+    formats?: ("markdown" | "html" | "rawHtml" | "screenshot")[];
+    onlyMainContent?: boolean;
+}
+
 export class FirecrawlClient {
     private apiKey: string;
     private baseUrl = "https://api.firecrawl.dev/v0";
@@ -42,7 +47,7 @@ export class FirecrawlClient {
         }
     }
 
-    async scrapeUrl(url: string): Promise<FirecrawlScrapeResponse> {
+    async scrapeUrl(url: string, options?: ScrapeOptions): Promise<FirecrawlScrapeResponse> {
         if (!this.apiKey) {
             return {
                 success: false,
@@ -59,9 +64,8 @@ export class FirecrawlClient {
                 },
                 body: JSON.stringify({
                     url,
-                    pageOptions: {
-                        onlyMainContent: true,
-                    },
+                    formats: options?.formats || ["markdown"],
+                    onlyMainContent: options?.onlyMainContent ?? true,
                 }),
             });
 
@@ -85,7 +89,7 @@ export class FirecrawlClient {
             return {
                 success: true,
                 data: {
-                    content: data.data.markdown || data.data.content,
+                    content: data.data.markdown || data.data.html || data.data.rawHtml || data.data.content,
                     metadata: data.data.metadata,
                 },
             };
