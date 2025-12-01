@@ -98,6 +98,7 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
     const [autoReplace, setAutoReplace] = useState(true);
     const [scrapeDepth, setScrapeDepth] = useState<"single" | "crawl">("single");
     const [maxPages, setMaxPages] = useState("10");
+    const [useAdvanced, setUseAdvanced] = useState(false);
 
     // Advanced Options
 
@@ -269,14 +270,14 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
             },
         }));
 
-        await onUpload(documents, {
+        await onUpload(documents, useAdvanced ? {
             chunkSize: chunkSize[0],
             chunkOverlap: chunkOverlap[0]
-        });
+        } : undefined);
 
         // Clear completed jobs
         setUrls((prev) => prev.filter((u) => u.status !== "completed"));
-    }, [urls, onUpload, chunkSize, chunkOverlap]);
+    }, [urls, onUpload, chunkSize, chunkOverlap, useAdvanced]);
 
     const completedCount = urls.filter((u) => u.status === "completed").length;
     const pendingCount = urls.filter((u) => u.status === "pending" || u.status === "error").length;
@@ -395,6 +396,8 @@ export function ScrapeUpload({ onUpload, disabled }: ScrapeUploadProps) {
                     if (opts.onlyMainContent !== undefined) setOnlyMainContent(opts.onlyMainContent);
                 }}
                 showParsingOptions={true}
+                enabled={useAdvanced}
+                onEnabledChange={setUseAdvanced}
             />
 
             {/* Supported Formats Info */}

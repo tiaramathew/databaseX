@@ -16,11 +16,16 @@ export function TextInputUpload({ onUpload, disabled = false }: TextInputUploadP
     const [content, setContent] = useState("");
     const [chunkSize, setChunkSize] = useState(1000);
     const [chunkOverlap, setChunkOverlap] = useState(200);
+    const [useAdvanced, setUseAdvanced] = useState(false);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (title.trim() && content.trim() && !disabled) {
-            onUpload(title.trim(), content.trim(), { chunkSize, chunkOverlap });
+            onUpload(
+                title.trim(),
+                content.trim(),
+                useAdvanced ? { chunkSize, chunkOverlap } : undefined
+            );
             setTitle("");
             setContent("");
         }
@@ -78,6 +83,8 @@ export function TextInputUpload({ onUpload, disabled = false }: TextInputUploadP
                     setChunkOverlap(opts.chunkOverlap);
                 }}
                 showParsingOptions={false}
+                enabled={useAdvanced}
+                onEnabledChange={setUseAdvanced}
             />
 
             <div className="flex justify-end">

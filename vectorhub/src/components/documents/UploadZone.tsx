@@ -15,6 +15,7 @@ export function UploadZone({ onUpload, disabled = false }: UploadZoneProps) {
     const [files, setFiles] = useState<File[]>([]);
     const [chunkSize, setChunkSize] = useState(1000);
     const [chunkOverlap, setChunkOverlap] = useState(200);
+    const [useAdvanced, setUseAdvanced] = useState(false);
 
     const handleDragOver = useCallback(
         (e: React.DragEvent) => {
@@ -56,7 +57,7 @@ export function UploadZone({ onUpload, disabled = false }: UploadZoneProps) {
 
     const handleUpload = () => {
         if (files.length > 0 && !disabled) {
-            onUpload(files, { chunkSize, chunkOverlap });
+            onUpload(files, useAdvanced ? { chunkSize, chunkOverlap } : undefined);
             setFiles([]);
         }
     };
@@ -126,6 +127,8 @@ export function UploadZone({ onUpload, disabled = false }: UploadZoneProps) {
                     setChunkOverlap(opts.chunkOverlap);
                 }}
                 showParsingOptions={false}
+                enabled={useAdvanced}
+                onEnabledChange={setUseAdvanced}
             />
 
             <AnimatePresence mode="popLayout">

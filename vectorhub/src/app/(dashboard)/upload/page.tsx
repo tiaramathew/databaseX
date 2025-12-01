@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useStore } from "@/store";
-import { UploadZone } from "@/components/documents/UploadZone";
+// import { UploadZone } from "@/components/documents/UploadZone";
 import { TextInputUpload } from "@/components/documents/TextInputUpload";
 import { ScrapeUpload, ScrapedDocument } from "@/components/documents/ScrapeUpload";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -216,120 +216,14 @@ export default function UploadPage() {
 
 
 
+    /*
     const handleFileUpload = useCallback(
         async (files: File[], options?: { chunkSize: number; chunkOverlap: number }) => {
-            if (!ensureTargetsSelected()) return;
-
-            setIsUploading(true);
-            const toastId = toast.loading(`Processing ${files.length} file(s)...`);
-
-            try {
-                const allDocs: VectorDocument[] = [];
-
-                for (const file of files) {
-                    let content = "";
-
-                    // Handle PDF and DOCX files via server-side parsing
-                    if (file.type === "application/pdf" ||
-                        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-                        file.name.endsWith(".docx")) {
-
-                        const formData = new FormData();
-                        formData.append("file", file);
-
-                        try {
-                            const res = await fetch("/api/parse", {
-                                method: "POST",
-                                body: formData,
-                            });
-
-                            if (!res.ok) {
-                                throw new Error(`Failed to parse file: ${res.statusText}`);
-                            }
-
-                            const data = await res.json();
-                            content = data.text;
-
-                            if (!content || content.trim().length === 0) {
-                                toast.warning(`No text found in ${file.name}`, {
-                                    description: "The file might be empty or contain only images."
-                                });
-                                content = `[Empty content for ${file.name}]`;
-                            }
-                        } catch (err) {
-                            console.error("File parsing failed:", err);
-                            toast.error(`Failed to parse ${file.name}`);
-                            content = `[Failed to parse content for ${file.name}]`;
-                        }
-                    }
-                    // Simple text reading for supported text formats
-                    else if (file.type === "text/plain" || file.name.endsWith(".md") || file.name.endsWith(".json") || file.name.endsWith(".csv") || file.name.endsWith(".txt")) {
-                        content = await file.text();
-                    } else {
-                        // For other binary files, we'd need server-side processing or client-side libraries
-                        // For now, we'll use a placeholder or warn
-                        content = `[Binary file content placeholder for ${file.name}]`;
-                    }
-
-                    const chunks = options
-                        ? splitText(content, options.chunkSize, options.chunkOverlap)
-                        : [content];
-
-                    chunks.forEach((chunk, i) => {
-                        allDocs.push({
-                            id: crypto.randomUUID(),
-                            content: chunk,
-                            metadata: {
-                                source: file.name,
-                                type: file.type,
-                                size: file.size,
-                                created_at: new Date(),
-                                connectionId: selectedConnection,
-                                collectionName: selectedCollection,
-                                chunkIndex: i,
-                                totalChunks: chunks.length,
-                                originalName: file.name
-                            },
-                        });
-                    });
-                }
-
-                const connection = connections.find((c) => c.id === selectedConnection);
-                const returnedIds = await addDocumentsApi(selectedCollection, allDocs, connection);
-
-                // Update store with new docs (might be too many, maybe just add a few or refetch)
-                // For performance, maybe we shouldn't add ALL chunks to the store if there are thousands
-                // But for now, let's stick to the pattern
-                allDocs.forEach((doc, index) => {
-                    addDocument({ ...doc, id: returnedIds[index] || doc.id });
-                });
-
-                await syncCollectionsFromDb();
-                await syncToExternalConnections(allDocs, selectedCollection);
-
-                toast.success(`${files.length} file(s) processed`, {
-                    id: toastId,
-                    description: `Created ${allDocs.length} chunks in "${selectedCollection}".`,
-                });
-            } catch (error) {
-                toast.error("Upload failed", {
-                    id: toastId,
-                    description: error instanceof Error ? error.message : "Could not upload files. Please try again.",
-                });
-            } finally {
-                setIsUploading(false);
-            }
+            // ... (removed)
         },
-        [
-            ensureTargetsSelected,
-            selectedConnection,
-            selectedCollection,
-            addDocument,
-            syncCollectionsFromDb,
-            syncToExternalConnections,
-            connections,
-        ]
+        []
     );
+    */
 
     const handleTextUpload = useCallback(
         async (title: string, content: string, options?: { chunkSize: number; chunkOverlap: number }) => {
@@ -645,12 +539,12 @@ export default function UploadPage() {
             )}
 
             <motion.div variants={itemVariants}>
-                <Tabs defaultValue="files" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="files" className="flex items-center gap-2">
+                <Tabs defaultValue="text" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        {/* <TabsTrigger value="files" className="flex items-center gap-2">
                             <Upload className="h-4 w-4" />
                             File Upload
-                        </TabsTrigger>
+                        </TabsTrigger> */}
                         <TabsTrigger value="text" className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
                             Text Input
@@ -660,7 +554,7 @@ export default function UploadPage() {
                             Scrape & Crawl
                         </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="files" className="mt-4">
+                    {/* <TabsContent value="files" className="mt-4">
                         <Card>
                             <CardContent className="pt-6">
                                 <UploadZone
@@ -669,7 +563,7 @@ export default function UploadPage() {
                                 />
                             </CardContent>
                         </Card>
-                    </TabsContent>
+                    </TabsContent> */}
                     <TabsContent value="text" className="mt-4">
                         <Card>
                             <CardContent className="pt-6">

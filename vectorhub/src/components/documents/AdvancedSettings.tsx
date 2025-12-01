@@ -38,12 +38,16 @@ interface AdvancedSettingsProps {
     options: AdvancedOptions;
     onChange: (options: AdvancedOptions) => void;
     showParsingOptions?: boolean;
+    enabled: boolean;
+    onEnabledChange: (enabled: boolean) => void;
 }
 
 export function AdvancedSettings({
     options,
     onChange,
     showParsingOptions = false,
+    enabled,
+    onEnabledChange,
 }: AdvancedSettingsProps) {
     const [isOpen, setIsOpen] = useState(false);
 
@@ -61,24 +65,45 @@ export function AdvancedSettings({
     };
 
     return (
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Collapsible
+            open={isOpen && enabled}
+            onOpenChange={(open) => {
+                if (enabled) setIsOpen(open);
+            }}
+        >
             <Card>
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Settings className="h-4 w-4" />
-                            Advanced Options
-                        </CardTitle>
-                        <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="sm" className="w-9 p-0">
-                                {isOpen ? (
-                                    <ChevronUp className="h-4 w-4" />
-                                ) : (
-                                    <ChevronDown className="h-4 w-4" />
-                                )}
-                                <span className="sr-only">Toggle</span>
-                            </Button>
-                        </CollapsibleTrigger>
+                        <div className="flex items-center gap-4">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                <Settings className="h-4 w-4" />
+                                Advanced Options
+                            </CardTitle>
+                            <div className="flex items-center gap-2">
+                                <Switch
+                                    checked={enabled}
+                                    onCheckedChange={(checked) => {
+                                        onEnabledChange(checked);
+                                        if (checked) setIsOpen(true);
+                                    }}
+                                />
+                                <Label className="text-xs font-normal text-muted-foreground">
+                                    {enabled ? "Enabled" : "Disabled"}
+                                </Label>
+                            </div>
+                        </div>
+                        {enabled && (
+                            <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="w-9 p-0">
+                                    {isOpen ? (
+                                        <ChevronUp className="h-4 w-4" />
+                                    ) : (
+                                        <ChevronDown className="h-4 w-4" />
+                                    )}
+                                    <span className="sr-only">Toggle</span>
+                                </Button>
+                            </CollapsibleTrigger>
+                        )}
                     </div>
                     <CardDescription className="text-xs">
                         Configure {showParsingOptions ? "parsing formats and " : ""}chunking strategy
