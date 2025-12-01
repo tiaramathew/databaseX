@@ -140,7 +140,7 @@ async function fetchConnectionDetails(connection: ConnectionConfig): Promise<{
 }
 
 function getServerInfo(connection: ConnectionConfig): Record<string, string> {
-    const config = connection.config as Record<string, unknown>;
+    const config = connection.config as unknown as Record<string, unknown>;
     const info: Record<string, string> = {
         "Connection ID": connection.id,
         "Type": connection.type,

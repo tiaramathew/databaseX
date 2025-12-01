@@ -35,57 +35,57 @@ const databaseOptions: {
         badge?: string;
     }[];
 }[] = [
-    {
-        category: "Popular Vector Databases",
-        databases: [
-            { value: "pinecone", label: "Pinecone", description: "Fully managed vector database" },
-            { value: "weaviate", label: "Weaviate", description: "Open-source vector search engine" },
-            { value: "qdrant", label: "Qdrant", description: "High-performance vector similarity search" },
-            { value: "chromadb", label: "ChromaDB", description: "AI-native open-source embedding database" },
-            { value: "milvus", label: "Milvus", description: "Open-source vector database for AI" },
-        ],
-    },
-    {
-        category: "Cloud Databases",
-        databases: [
-            { value: "supabase", label: "Supabase", description: "Open source Firebase alternative with pgvector" },
-            { value: "mongodb_atlas", label: "MongoDB Atlas", description: "Multi-cloud vector search" },
-            { value: "astra_db", label: "Astra DB", description: "Serverless Cassandra with vector search", badge: "DataStax" },
-            { value: "upstash", label: "Upstash", description: "Serverless Redis with vector support" },
-            { value: "turbopuffer", label: "Turbopuffer", description: "Serverless vector database" },
-        ],
-    },
-    {
-        category: "Graph Databases",
-        databases: [
-            { value: "neo4j", label: "Neo4j", description: "Graph database with vector index support", badge: "Graph" },
-        ],
-    },
-    {
-        category: "Search Engines",
-        databases: [
-            { value: "elasticsearch", label: "Elasticsearch", description: "Distributed search with vector support" },
-            { value: "opensearch", label: "OpenSearch", description: "Open-source search and analytics" },
-            { value: "typesense", label: "Typesense", description: "Fast, typo-tolerant search engine" },
-            { value: "vespa", label: "Vespa", description: "Big data processing and vector search" },
-        ],
-    },
-    {
-        category: "SQL & Relational",
-        databases: [
-            { value: "pgvector", label: "PostgreSQL + pgvector", description: "Vector similarity in PostgreSQL" },
-            { value: "singlestore", label: "SingleStore", description: "Distributed SQL with vector capabilities" },
-        ],
-    },
-    {
-        category: "Other Vector Stores",
-        databases: [
-            { value: "redis", label: "Redis Stack", description: "In-memory vector store" },
-            { value: "lancedb", label: "LanceDB", description: "Embedded vector database for AI" },
-            { value: "marqo", label: "Marqo", description: "Tensor search engine" },
-        ],
-    },
-];
+        {
+            category: "Popular Vector Databases",
+            databases: [
+                { value: "pinecone", label: "Pinecone", description: "Fully managed vector database" },
+                { value: "weaviate", label: "Weaviate", description: "Open-source vector search engine" },
+                { value: "qdrant", label: "Qdrant", description: "High-performance vector similarity search" },
+                { value: "chromadb", label: "ChromaDB", description: "AI-native open-source embedding database" },
+                { value: "milvus", label: "Milvus", description: "Open-source vector database for AI" },
+            ],
+        },
+        {
+            category: "Cloud Databases",
+            databases: [
+                { value: "supabase", label: "Supabase", description: "Open source Firebase alternative with pgvector" },
+                { value: "mongodb_atlas", label: "MongoDB Atlas", description: "Multi-cloud vector search" },
+                { value: "astra_db", label: "Astra DB", description: "Serverless Cassandra with vector search", badge: "DataStax" },
+                { value: "upstash", label: "Upstash", description: "Serverless Redis with vector support" },
+                { value: "turbopuffer", label: "Turbopuffer", description: "Serverless vector database" },
+            ],
+        },
+        {
+            category: "Graph Databases",
+            databases: [
+                { value: "neo4j", label: "Neo4j", description: "Graph database with vector index support", badge: "Graph" },
+            ],
+        },
+        {
+            category: "Search Engines",
+            databases: [
+                { value: "elasticsearch", label: "Elasticsearch", description: "Distributed search with vector support" },
+                { value: "opensearch", label: "OpenSearch", description: "Open-source search and analytics" },
+                { value: "typesense", label: "Typesense", description: "Fast, typo-tolerant search engine" },
+                { value: "vespa", label: "Vespa", description: "Big data processing and vector search" },
+            ],
+        },
+        {
+            category: "SQL & Relational",
+            databases: [
+                { value: "pgvector", label: "PostgreSQL + pgvector", description: "Vector similarity in PostgreSQL" },
+                { value: "singlestore", label: "SingleStore", description: "Distributed SQL with vector capabilities" },
+            ],
+        },
+        {
+            category: "Other Vector Stores",
+            databases: [
+                { value: "redis", label: "Redis Stack", description: "In-memory vector store" },
+                { value: "lancedb", label: "LanceDB", description: "Embedded vector database for AI" },
+                { value: "marqo", label: "Marqo", description: "Tensor search engine" },
+            ],
+        },
+    ];
 
 // Field configuration for each database type
 const getFieldsForType = (type: VectorDBType) => {
@@ -353,7 +353,7 @@ export function ConnectionForm({ onSubmit, onCancel }: ConnectionFormProps) {
             type,
             status: "connected",
             lastSync: new Date(),
-            config: config as ConnectionConfig["config"],
+            config: config as unknown as ConnectionConfig["config"],
         });
     }, [name, type, buildConfig, onSubmit]);
 
@@ -459,7 +459,7 @@ export function ConnectionForm({ onSubmit, onCancel }: ConnectionFormProps) {
                                                 <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {field.options?.map((opt) => (
+                                                {(field as any).options?.map((opt: string) => (
                                                     <SelectItem key={opt} value={opt}>
                                                         {opt}
                                                     </SelectItem>

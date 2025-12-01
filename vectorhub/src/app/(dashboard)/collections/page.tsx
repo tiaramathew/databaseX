@@ -18,6 +18,13 @@ import {
     getCollectionStatsApi,
 } from "@/lib/api/collections";
 import { Layers } from "lucide-react";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -38,6 +45,12 @@ export default function CollectionsPage() {
     const addCollection = useStore((state) => state.addCollection);
     const removeCollection = useStore((state) => state.removeCollection);
     const setCollections = useStore((state) => state.setCollections);
+    const connections = useStore((state) => state.connections);
+    const activeConnectionId = useStore((state) => state.activeConnectionId);
+    const setActiveConnection = useStore((state) => state.setActiveConnection);
+    const getConnection = useStore((state) => state.getConnection);
+
+    const activeConnection = activeConnectionId ? getConnection(activeConnectionId) : null;
 
     const [isLoading, setIsLoading] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -56,13 +69,26 @@ export default function CollectionsPage() {
         let mounted = true;
 
         const loadCollections = async () => {
+            if (!activeConnectionId) {
+                setCollections([]);
+                setIsLoading(false);
+                return;
+            }
+
+            setIsLoading(true);
             try {
-                const data = await listCollectionsApi();
-                if (mounted) {
-                    setCollections(data);
+                // Pass the active connection config to the API
+                if (activeConnection) {
+                    const data = await listCollectionsApi(activeConnection);
+                    if (mounted) {
+                        setCollections(data);
+                    }
                 }
             } catch {
                 // Collections from store are used if API fails
+                if (mounted) {
+                    setCollections([]);
+                }
             } finally {
                 if (mounted) {
                     setIsLoading(false);
@@ -75,14 +101,14 @@ export default function CollectionsPage() {
         return () => {
             mounted = false;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run on mount - setCollections is stable from Zustand
+    }, [activeConnectionId, activeConnection, setCollections]);
 
     const handleCreate = useCallback(
         async (config: CreateCollectionConfig) => {
+            if (!activeConnection) return;
             const toastId = toast.loading("Creating collection...");
             try {
-                const created = await createCollectionApi(config);
+                const created = await createCollectionApi(config, activeConnection);
                 addCollection(created);
                 toast.success("Collection created successfully", {
                     id: toastId,
@@ -95,15 +121,15 @@ export default function CollectionsPage() {
                 });
             }
         },
-        [addCollection]
+        [addCollection, activeConnection]
     );
 
     const handleDeleteConfirm = useCallback(async () => {
-        if (!deleteTarget) return;
+        if (!deleteTarget || !activeConnection) return;
 
         setIsDeleting(true);
         try {
-            await deleteCollectionApi(deleteTarget, true);
+            await deleteCollectionApi(deleteTarget, true, activeConnection);
             removeCollection(deleteTarget);
             toast.success("Collection deleted", {
                 description: `"${deleteTarget}" has been permanently removed.`,
@@ -116,7 +142,7 @@ export default function CollectionsPage() {
             setIsDeleting(false);
             setDeleteTarget(null);
         }
-    }, [deleteTarget, removeCollection]);
+    }, [deleteTarget, removeCollection, activeConnection]);
 
     const handleDelete = useCallback((name: string) => {
         setDeleteTarget(name);
@@ -158,9 +184,10 @@ export default function CollectionsPage() {
     );
 
     const handleViewStats = useCallback(async (name: string) => {
+        if (!activeConnection) return;
         const toastId = toast.loading("Loading stats...");
         try {
-            const stats = await getCollectionStatsApi(name);
+            const stats = await getCollectionStatsApi(name, activeConnection);
             toast.success(`Stats for "${name}"`, {
                 id: toastId,
                 description: `${stats.vectorCount.toLocaleString()} vectors, ${(stats.indexSize / 1024).toFixed(1)} KB index size`,
@@ -171,7 +198,7 @@ export default function CollectionsPage() {
                 description: "Could not retrieve collection statistics.",
             });
         }
-    }, []);
+    }, [activeConnection]);
 
     if (isLoading) {
         return (
@@ -211,7 +238,31 @@ export default function CollectionsPage() {
                             Manage your vector collections and indices.
                         </p>
                     </div>
-                    <CreateCollectionModal onSubmit={handleCreate} />
+                    <div className="flex items-center gap-4">
+                        <div className="w-[200px]">
+                            <Select
+                                value={activeConnectionId || ""}
+                                onValueChange={(value) => setActiveConnection(value || null)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select connection" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {connections.map((conn) => (
+                                        <SelectItem key={conn.id} value={conn.id}>
+                                            {conn.name}
+                                        </SelectItem>
+                                    ))}
+                                    {connections.length === 0 && (
+                                        <div className="p-2 text-sm text-muted-foreground text-center">
+                                            No connections
+                                        </div>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <CreateCollectionModal onSubmit={handleCreate} disabled={!activeConnectionId} />
+                    </div>
                 </motion.div>
 
                 <motion.div

@@ -45,11 +45,11 @@ async function testMCPConnection(
 
     // Determine tools based on server name/command pattern
     const serverName = name.toLowerCase();
-    
+
     // Mock tools based on common MCP servers
     let mockTools: { name: string; description?: string }[] = [];
     let mockResources: { name: string; uri?: string; description?: string }[] = [];
-    
+
     if (serverName.includes("mongo")) {
         mockTools = [
             { name: "find", description: "Find documents in a collection" },
@@ -236,7 +236,7 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
     const [inputMode, setInputMode] = useState<"form" | "json">("form");
     const [copied, setCopied] = useState(false);
     const [advancedOpen, setAdvancedOpen] = useState(false);
-    
+
     // Test connection state
     const [step, setStep] = useState<"form" | "testing" | "result">("form");
     const [testResult, setTestResult] = useState<ConnectionTestData | null>(null);
@@ -270,13 +270,13 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
     const applyTemplate = useCallback((template: typeof mcpTemplates[0]) => {
         setName(template.name);
         setTransportType(template.config.type);
-        
+
         if (template.config.type === "stdio") {
             setCommand(template.config.command || "npx");
             setArgs(template.config.args || []);
             const envArray = Object.entries(template.config.env || {}).map(([key, value]) => ({
                 key,
-                value: value || template.envPlaceholders[key] || "",
+                value: value || (template.envPlaceholders as Record<string, string>)[key] || "",
             }));
             setEnvVars(envArray);
         } else {
@@ -288,19 +288,19 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
         try {
             const parsed = JSON.parse(json);
             setJsonError(null);
-            
+
             // Determine the servers object (supports both "servers" and "mcpServers" formats)
             const serversObj = parsed.servers || parsed.mcpServers;
-            
+
             if (serversObj) {
                 const serverNames = Object.keys(serversObj);
                 if (serverNames.length > 0) {
                     const serverName = serverNames[0];
                     const serverConfig = serversObj[serverName];
-                    
+
                     setName(serverName);
                     setTransportType(serverConfig.type || "stdio");
-                    
+
                     if (serverConfig.type === "sse") {
                         setSseUrl(serverConfig.url || "");
                     } else {
@@ -311,17 +311,17 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
                             value: value as string,
                         }));
                         setEnvVars(envArray);
-                        
+
                         // Auto-extract webhook URL from supergateway args
                         if (serverConfig.args && Array.isArray(serverConfig.args)) {
                             const args = serverConfig.args as string[];
-                            const streamableIndex = args.findIndex((arg: string) => 
+                            const streamableIndex = args.findIndex((arg: string) =>
                                 arg === "--streamableHttp" || arg === "--sse"
                             );
                             if (streamableIndex !== -1 && args[streamableIndex + 1]) {
                                 setWebhookUrl(args[streamableIndex + 1]);
                             }
-                            
+
                             // Extract auth token from --header
                             const headerIndex = args.findIndex((arg: string) => arg === "--header");
                             if (headerIndex !== -1 && args[headerIndex + 1]) {
@@ -480,276 +480,276 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
                 <TabsContent value="form" className="flex-1 min-h-0 mt-4">
                     <ScrollArea className="h-[calc(70vh-180px)] pr-4">
                         <div className="space-y-4">
-                    {/* Templates */}
-                    <div className="space-y-2">
-                        <Label className="text-sm font-medium">Quick Start Templates</Label>
-                        <ScrollArea className="h-[100px]">
-                            <div className="flex flex-wrap gap-2">
-                                {mcpTemplates.map((template) => (
-                                    <Badge
-                                        key={template.name}
-                                        variant="outline"
-                                        className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors py-1.5"
-                                        onClick={() => applyTemplate(template)}
-                                    >
-                                        {template.name}
-                                    </Badge>
-                                ))}
-                            </div>
-                        </ScrollArea>
-                    </div>
-
-                    {/* Connection Name */}
-                    <div className="space-y-2">
-                        <Label htmlFor="name">
-                            Server Name <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                            id="name"
-                            placeholder="mongodb, filesystem, github, etc."
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                        />
-                    </div>
-
-                    {/* Transport Type */}
-                    <div className="space-y-2">
-                        <Label>Transport Type</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                            <Button
-                                type="button"
-                                variant={transportType === "stdio" ? "default" : "outline"}
-                                className="w-full justify-start"
-                                onClick={() => setTransportType("stdio")}
-                            >
-                                <Terminal className="mr-2 h-4 w-4" />
-                                stdio
-                            </Button>
-                            <Button
-                                type="button"
-                                variant={transportType === "sse" ? "default" : "outline"}
-                                className="w-full justify-start"
-                                onClick={() => setTransportType("sse")}
-                            >
-                                <Globe className="mr-2 h-4 w-4" />
-                                SSE
-                            </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            {transportType === "stdio"
-                                ? "Run a local command (most common for npx packages)"
-                                : "Connect to a remote server via Server-Sent Events"}
-                        </p>
-                    </div>
-
-                    {transportType === "stdio" ? (
-                        <>
-                            {/* Command */}
+                            {/* Templates */}
                             <div className="space-y-2">
-                                <Label htmlFor="command">
-                                    Command <span className="text-destructive">*</span>
-                                </Label>
-                                <Select value={command} onValueChange={setCommand}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select command" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="npx">npx</SelectItem>
-                                        <SelectItem value="node">node</SelectItem>
-                                        <SelectItem value="python">python</SelectItem>
-                                        <SelectItem value="python3">python3</SelectItem>
-                                        <SelectItem value="uvx">uvx</SelectItem>
-                                        <SelectItem value="docker">docker</SelectItem>
-                                        <SelectItem value="custom">Custom...</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {command === "custom" && (
-                                    <Input
-                                        placeholder="Enter custom command"
-                                        onChange={(e) => setCommand(e.target.value)}
-                                        className="mt-2"
-                                    />
-                                )}
-                            </div>
-
-                            {/* Arguments */}
-                            <div className="space-y-2">
-                                <Label>Arguments</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        placeholder="Add argument (e.g., -y, @scope/package@latest)"
-                                        value={argsInput}
-                                        onChange={(e) => setArgsInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                addArg();
-                                            }
-                                        }}
-                                    />
-                                    <Button type="button" variant="outline" size="icon" onClick={addArg}>
-                                        <Plus className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                {args.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        {args.map((arg, index) => (
+                                <Label className="text-sm font-medium">Quick Start Templates</Label>
+                                <ScrollArea className="h-[100px]">
+                                    <div className="flex flex-wrap gap-2">
+                                        {mcpTemplates.map((template) => (
                                             <Badge
-                                                key={index}
-                                                variant="secondary"
-                                                className="flex items-center gap-1 pr-1"
+                                                key={template.name}
+                                                variant="outline"
+                                                className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors py-1.5"
+                                                onClick={() => applyTemplate(template)}
                                             >
-                                                <code className="text-xs">{arg}</code>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-4 w-4 hover:bg-destructive/20"
-                                                    onClick={() => removeArg(index)}
-                                                >
-                                                    <Trash2 className="h-3 w-3" />
-                                                </Button>
+                                                {template.name}
                                             </Badge>
                                         ))}
                                     </div>
-                                )}
+                                </ScrollArea>
+                            </div>
+
+                            {/* Connection Name */}
+                            <div className="space-y-2">
+                                <Label htmlFor="name">
+                                    Server Name <span className="text-destructive">*</span>
+                                </Label>
+                                <Input
+                                    id="name"
+                                    placeholder="mongodb, filesystem, github, etc."
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            {/* Transport Type */}
+                            <div className="space-y-2">
+                                <Label>Transport Type</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button
+                                        type="button"
+                                        variant={transportType === "stdio" ? "default" : "outline"}
+                                        className="w-full justify-start"
+                                        onClick={() => setTransportType("stdio")}
+                                    >
+                                        <Terminal className="mr-2 h-4 w-4" />
+                                        stdio
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant={transportType === "sse" ? "default" : "outline"}
+                                        className="w-full justify-start"
+                                        onClick={() => setTransportType("sse")}
+                                    >
+                                        <Globe className="mr-2 h-4 w-4" />
+                                        SSE
+                                    </Button>
+                                </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Press Enter or click + to add each argument
+                                    {transportType === "stdio"
+                                        ? "Run a local command (most common for npx packages)"
+                                        : "Connect to a remote server via Server-Sent Events"}
                                 </p>
                             </div>
 
-                            {/* Environment Variables */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <Label>Environment Variables</Label>
-                                    <Button type="button" variant="ghost" size="sm" onClick={addEnvVar}>
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        Add
-                                    </Button>
-                                </div>
-                                {envVars.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground py-2">
-                                        No environment variables. Click &quot;Add&quot; to configure.
-                                    </p>
-                                ) : (
+                            {transportType === "stdio" ? (
+                                <>
+                                    {/* Command */}
                                     <div className="space-y-2">
-                                        {envVars.map((env, index) => (
-                                            <div key={index} className="flex gap-2 items-start">
-                                                <Input
-                                                    placeholder="KEY"
-                                                    value={env.key}
-                                                    onChange={(e) => updateEnvVar(index, "key", e.target.value)}
-                                                    className="w-1/3 font-mono text-sm"
-                                                />
-                                                <Input
-                                                    placeholder="value"
-                                                    type="password"
-                                                    value={env.value}
-                                                    onChange={(e) => updateEnvVar(index, "value", e.target.value)}
-                                                    className="flex-1 font-mono text-sm"
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-destructive hover:text-destructive"
-                                                    onClick={() => removeEnvVar(index)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
+                                        <Label htmlFor="command">
+                                            Command <span className="text-destructive">*</span>
+                                        </Label>
+                                        <Select value={command} onValueChange={setCommand}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select command" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="npx">npx</SelectItem>
+                                                <SelectItem value="node">node</SelectItem>
+                                                <SelectItem value="python">python</SelectItem>
+                                                <SelectItem value="python3">python3</SelectItem>
+                                                <SelectItem value="uvx">uvx</SelectItem>
+                                                <SelectItem value="docker">docker</SelectItem>
+                                                <SelectItem value="custom">Custom...</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        {command === "custom" && (
+                                            <Input
+                                                placeholder="Enter custom command"
+                                                onChange={(e) => setCommand(e.target.value)}
+                                                className="mt-2"
+                                            />
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </>
-                    ) : (
-                        /* SSE URL */
-                        <div className="space-y-2">
-                            <Label htmlFor="sseUrl">
-                                Server URL <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                                id="sseUrl"
-                                placeholder="http://localhost:3001/sse"
-                                value={sseUrl}
-                                onChange={(e) => setSseUrl(e.target.value)}
-                                required
-                            />
-                        </div>
-                    )}
 
-                    {/* Advanced Options */}
-                    <div className="space-y-2">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="w-full justify-between"
-                            onClick={() => setAdvancedOpen(!advancedOpen)}
-                        >
-                            <span className="text-sm text-muted-foreground">Advanced Options</span>
-                            <ChevronDown
-                                className={cn(
-                                    "h-4 w-4 transition-transform",
-                                    advancedOpen && "rotate-180"
-                                )}
-                            />
-                        </Button>
-                        {advancedOpen && (
-                            <div className="space-y-4 pt-2 pl-2">
+                                    {/* Arguments */}
+                                    <div className="space-y-2">
+                                        <Label>Arguments</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Add argument (e.g., -y, @scope/package@latest)"
+                                                value={argsInput}
+                                                onChange={(e) => setArgsInput(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault();
+                                                        addArg();
+                                                    }
+                                                }}
+                                            />
+                                            <Button type="button" variant="outline" size="icon" onClick={addArg}>
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        {args.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {args.map((arg, index) => (
+                                                    <Badge
+                                                        key={index}
+                                                        variant="secondary"
+                                                        className="flex items-center gap-1 pr-1"
+                                                    >
+                                                        <code className="text-xs">{arg}</code>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-4 w-4 hover:bg-destructive/20"
+                                                            onClick={() => removeArg(index)}
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-muted-foreground">
+                                            Press Enter or click + to add each argument
+                                        </p>
+                                    </div>
+
+                                    {/* Environment Variables */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Environment Variables</Label>
+                                            <Button type="button" variant="ghost" size="sm" onClick={addEnvVar}>
+                                                <Plus className="h-4 w-4 mr-1" />
+                                                Add
+                                            </Button>
+                                        </div>
+                                        {envVars.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground py-2">
+                                                No environment variables. Click &quot;Add&quot; to configure.
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {envVars.map((env, index) => (
+                                                    <div key={index} className="flex gap-2 items-start">
+                                                        <Input
+                                                            placeholder="KEY"
+                                                            value={env.key}
+                                                            onChange={(e) => updateEnvVar(index, "key", e.target.value)}
+                                                            className="w-1/3 font-mono text-sm"
+                                                        />
+                                                        <Input
+                                                            placeholder="value"
+                                                            type="password"
+                                                            value={env.value}
+                                                            onChange={(e) => updateEnvVar(index, "value", e.target.value)}
+                                                            className="flex-1 font-mono text-sm"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive hover:text-destructive"
+                                                            onClick={() => removeEnvVar(index)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                /* SSE URL */
                                 <div className="space-y-2">
-                                    <Label htmlFor="webhookUrl">
-                                        Webhook URL for AI Queries
+                                    <Label htmlFor="sseUrl">
+                                        Server URL <span className="text-destructive">*</span>
                                     </Label>
                                     <Input
-                                        id="webhookUrl"
-                                        placeholder="https://n8n.example.com/webhook/..."
-                                        value={webhookUrl}
-                                        onChange={(e) => setWebhookUrl(e.target.value)}
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        HTTP endpoint for RAG queries (n8n, Make.com, etc.). Required for AI-powered responses in RAG Playground.
-                                    </p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="authToken">Auth Token (Optional)</Label>
-                                    <Input
-                                        id="authToken"
-                                        type="password"
-                                        placeholder="Bearer token for authenticated servers"
-                                        value={authToken}
-                                        onChange={(e) => setAuthToken(e.target.value)}
+                                        id="sseUrl"
+                                        placeholder="http://localhost:3001/sse"
+                                        value={sseUrl}
+                                        onChange={(e) => setSseUrl(e.target.value)}
+                                        required
                                     />
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
 
-                    {/* Preview */}
-                    {name && (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-sm">Generated Config</Label>
+                            {/* Advanced Options */}
+                            <div className="space-y-2">
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    size="sm"
-                                    onClick={copyToClipboard}
+                                    className="w-full justify-between"
+                                    onClick={() => setAdvancedOpen(!advancedOpen)}
                                 >
-                                    {copied ? (
-                                        <Check className="h-4 w-4 mr-1" />
-                                    ) : (
-                                        <Copy className="h-4 w-4 mr-1" />
-                                    )}
-                                    {copied ? "Copied!" : "Copy"}
+                                    <span className="text-sm text-muted-foreground">Advanced Options</span>
+                                    <ChevronDown
+                                        className={cn(
+                                            "h-4 w-4 transition-transform",
+                                            advancedOpen && "rotate-180"
+                                        )}
+                                    />
                                 </Button>
+                                {advancedOpen && (
+                                    <div className="space-y-4 pt-2 pl-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="webhookUrl">
+                                                Webhook URL for AI Queries
+                                            </Label>
+                                            <Input
+                                                id="webhookUrl"
+                                                placeholder="https://n8n.example.com/webhook/..."
+                                                value={webhookUrl}
+                                                onChange={(e) => setWebhookUrl(e.target.value)}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                HTTP endpoint for RAG queries (n8n, Make.com, etc.). Required for AI-powered responses in RAG Playground.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="authToken">Auth Token (Optional)</Label>
+                                            <Input
+                                                id="authToken"
+                                                type="password"
+                                                placeholder="Bearer token for authenticated servers"
+                                                value={authToken}
+                                                onChange={(e) => setAuthToken(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto font-mono">
-                                {generateJsonConfig()}
-                            </pre>
-                        </div>
-                    )}
+
+                            {/* Preview */}
+                            {name && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm">Generated Config</Label>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={copyToClipboard}
+                                        >
+                                            {copied ? (
+                                                <Check className="h-4 w-4 mr-1" />
+                                            ) : (
+                                                <Copy className="h-4 w-4 mr-1" />
+                                            )}
+                                            {copied ? "Copied!" : "Copy"}
+                                        </Button>
+                                    </div>
+                                    <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto font-mono">
+                                        {generateJsonConfig()}
+                                    </pre>
+                                </div>
+                            )}
                         </div>
                     </ScrollArea>
                 </TabsContent>
@@ -757,20 +757,20 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
                 <TabsContent value="json" className="flex-1 min-h-0 mt-4">
                     <ScrollArea className="h-[calc(70vh-180px)] pr-4">
                         <div className="space-y-4">
-                    <div className="rounded-md bg-muted/50 p-3 flex items-start gap-2">
-                        <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <p className="text-xs text-muted-foreground">
-                            Paste your MCP server configuration JSON. Supports both the full format 
-                            {" "}<code className="bg-muted px-1 rounded">{"{ servers: { ... } }"}</code> and 
-                            direct server config.
-                        </p>
-                    </div>
+                            <div className="rounded-md bg-muted/50 p-3 flex items-start gap-2">
+                                <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-muted-foreground">
+                                    Paste your MCP server configuration JSON. Supports both the full format
+                                    {" "}<code className="bg-muted px-1 rounded">{"{ servers: { ... } }"}</code> and
+                                    direct server config.
+                                </p>
+                            </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="jsonConfig">JSON Configuration</Label>
-                        <Textarea
-                            id="jsonConfig"
-                            placeholder={`{
+                            <div className="space-y-2">
+                                <Label htmlFor="jsonConfig">JSON Configuration</Label>
+                                <Textarea
+                                    id="jsonConfig"
+                                    placeholder={`{
   "servers": {
     "mongodb": {
       "type": "stdio",
@@ -782,40 +782,40 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
     }
   }
 }`}
-                            value={jsonInput}
-                            onChange={(e) => {
-                                setJsonInput(e.target.value);
-                                if (e.target.value.trim()) {
-                                    parseJsonConfig(e.target.value);
-                                }
-                            }}
-                            className="min-h-[200px] font-mono text-sm"
-                        />
-                        {jsonError && (
-                            <p className="text-xs text-destructive">{jsonError}</p>
-                        )}
-                    </div>
+                                    value={jsonInput}
+                                    onChange={(e) => {
+                                        setJsonInput(e.target.value);
+                                        if (e.target.value.trim()) {
+                                            parseJsonConfig(e.target.value);
+                                        }
+                                    }}
+                                    className="min-h-[200px] font-mono text-sm"
+                                />
+                                {jsonError && (
+                                    <p className="text-xs text-destructive">{jsonError}</p>
+                                )}
+                            </div>
 
-                    {!jsonError && jsonInput && name && (
-                        <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3">
-                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                ✓ Valid configuration parsed for server &quot;{name}&quot;
-                            </p>
-                        </div>
-                    )}
+                            {!jsonError && jsonInput && name && (
+                                <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3">
+                                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                        ✓ Valid configuration parsed for server &quot;{name}&quot;
+                                    </p>
+                                </div>
+                            )}
 
-                    <div className="space-y-2">
-                        <Label htmlFor="name-json">
-                            Server Name <span className="text-destructive">*</span>
-                        </Label>
-                        <Input
-                            id="name-json"
-                            placeholder="Server name (auto-filled from JSON)"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                        />
-                    </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="name-json">
+                                    Server Name <span className="text-destructive">*</span>
+                                </Label>
+                                <Input
+                                    id="name-json"
+                                    placeholder="Server name (auto-filled from JSON)"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    required
+                                />
+                            </div>
                         </div>
                     </ScrollArea>
                 </TabsContent>

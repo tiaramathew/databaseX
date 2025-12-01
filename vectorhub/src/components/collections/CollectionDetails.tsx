@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { getCollectionStatsApi } from "@/lib/api/collections";
 import {
     Sheet,
     SheetContent,
@@ -86,47 +87,59 @@ export function CollectionDetails({
     onDelete,
 }: CollectionDetailsProps) {
     const documents = useStore((state) => state.documents);
-    
+
     const [isLoading, setIsLoading] = useState(false);
     const [stats, setStats] = useState<CollectionStats | null>(null);
     const [recentDocs, setRecentDocs] = useState<DocumentPreview[]>([]);
     const [copied, setCopied] = useState(false);
 
+    const activeConnectionId = useStore((state) => state.activeConnectionId);
+    const getConnection = useStore((state) => state.getConnection);
+    const activeConnection = activeConnectionId ? getConnection(activeConnectionId) : null;
+
     const loadDetails = useCallback(async () => {
-        if (!collection) return;
+        if (!collection || !activeConnection) return;
 
         setIsLoading(true);
-        
-        // Simulate loading stats
-        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Get documents for this collection from store
-        const collectionDocs = documents.filter(
-            (doc) => doc.metadata?.collectionName === collection.name
-        );
+        try {
+            // Fetch real stats from API
+            const realStats = await getCollectionStatsApi(collection.name, activeConnection);
 
-        // Generate mock stats based on actual data
-        const mockStats: CollectionStats = {
-            vectorCount: collection.documentCount,
-            indexSize: collection.documentCount * 1.5 * collection.dimensions * 4, // Approximate bytes
-            avgVectorSize: collection.dimensions * 4, // 4 bytes per float32
-            lastUpdated: new Date(Date.now() - Math.random() * 86400000),
-            queryCount24h: Math.floor(Math.random() * 500),
-            insertCount24h: collectionDocs.length,
-        };
+            // Enrich with local document info if needed, or just use API stats
+            // For now, we'll use the API stats primarily
+            setStats({
+                ...realStats,
+                avgVectorSize: collection.dimensions * 4, // Estimate
+                queryCount24h: 0, // Not available from adapter yet
+                insertCount24h: 0, // Not available from adapter yet
+            });
 
-        // Create document previews
-        const previews: DocumentPreview[] = collectionDocs.slice(0, 5).map((doc) => ({
-            id: doc.id,
-            content: doc.content.slice(0, 200) + (doc.content.length > 200 ? "..." : ""),
-            metadata: doc.metadata || {},
-            createdAt: new Date((doc.metadata?.created_at as string) || Date.now()),
-        }));
+            // Get documents for this collection from store (fallback/cache)
+            // In a real scenario, we might want to fetch these from API too if supported
+            const collectionDocs = documents.filter(
+                (doc) => doc.metadata?.collectionName === collection.name
+            );
 
-        setStats(mockStats);
-        setRecentDocs(previews);
-        setIsLoading(false);
-    }, [collection, documents]);
+            // Create document previews
+            const previews: DocumentPreview[] = collectionDocs.slice(0, 5).map((doc) => {
+                const content = doc.content || "";
+                return {
+                    id: doc.id || `doc-${Math.random().toString(36).substr(2, 9)}`,
+                    content: content.slice(0, 200) + (content.length > 200 ? "..." : ""),
+                    metadata: doc.metadata || {},
+                    createdAt: new Date((doc.metadata?.created_at as string) || Date.now()),
+                };
+            });
+
+            setRecentDocs(previews);
+        } catch (error) {
+            console.error("Failed to load collection details:", error);
+            toast.error("Failed to load collection stats");
+        } finally {
+            setIsLoading(false);
+        }
+    }, [collection, documents, activeConnection]);
 
     useEffect(() => {
         if (open && collection) {
@@ -412,7 +425,7 @@ export function CollectionDetails({
                                                     <Info className="h-4 w-4 text-muted-foreground" />
                                                     Collection Configuration
                                                 </h4>
-                                                
+
                                                 <div className="space-y-2">
                                                     {[
                                                         { label: "Collection Name", value: collection.name },

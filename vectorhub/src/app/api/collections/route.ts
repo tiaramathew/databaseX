@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { mockDbClient } from "@/lib/db/client";
+import { VectorDBClient } from "@/lib/db/client";
+import { ConnectionConfig } from "@/types/connections";
 import {
     createCollectionSchema,
     validateRequestBody,
@@ -7,16 +8,30 @@ import {
 import type { CreateCollectionConfig } from "@/lib/db/adapters/base";
 import { logger } from "@/lib/logger";
 
-export async function GET() {
+const getClient = (request: Request) => {
+    const configHeader = request.headers.get("x-connection-config");
+    if (!configHeader) {
+        throw new Error("Missing connection configuration");
+    }
     try {
-        const collections = await mockDbClient.listCollections();
+        const config = JSON.parse(configHeader) as ConnectionConfig;
+        return new VectorDBClient(config);
+    } catch (error) {
+        throw new Error("Invalid connection configuration");
+    }
+};
+
+export async function GET(request: Request) {
+    try {
+        const client = getClient(request);
+        const collections = await client.listCollections();
         return NextResponse.json(collections);
     } catch (error) {
         logger.error("GET /api/collections failed", error);
         return NextResponse.json(
             {
                 code: "INTERNAL_ERROR",
-                message: "Failed to list collections",
+                message: error instanceof Error ? error.message : "Failed to list collections",
             },
             { status: 500 }
         );
@@ -33,6 +48,7 @@ export async function POST(request: Request) {
     const { data } = validation;
 
     try {
+        const client = getClient(request);
         const config: CreateCollectionConfig = {
             name: data.name,
             description: data.description,
@@ -43,7 +59,7 @@ export async function POST(request: Request) {
             metadataSchema: data.metadataSchema,
         };
 
-        const created = await mockDbClient.createCollection(config);
+        const created = await client.createCollection(config);
 
         return NextResponse.json(created, { status: 201 });
     } catch (error) {
@@ -66,7 +82,7 @@ export async function POST(request: Request) {
         return NextResponse.json(
             {
                 code: "INTERNAL_ERROR",
-                message: "Failed to create collection",
+                message: error instanceof Error ? error.message : "Failed to create collection",
             },
             { status: 500 }
         );

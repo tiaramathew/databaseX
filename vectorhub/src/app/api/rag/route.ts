@@ -34,7 +34,7 @@ interface RAGResponse {
 // Generate an AI-like response based on query and context
 function generateResponse(query: string, context: SearchResult[], agentName?: string): string {
     const queryLower = query.toLowerCase();
-    
+
     // Handle common conversational queries
     if (queryLower.includes("who are you") || queryLower.includes("what are you")) {
         return `I'm the RAG Assistant for VectorHub! I help you search through your vector database and retrieve relevant information from your uploaded documents.
@@ -48,7 +48,7 @@ ${context.length > 0 ? `\nI found ${context.length} document(s) that might be re
 
 *${agentName || "Vector Search"}*`;
     }
-    
+
     if (queryLower.includes("where are you from") || queryLower.includes("where do you come from")) {
         return `I'm a RAG (Retrieval-Augmented Generation) assistant built into VectorHub. I run locally in your browser and connect to your configured vector databases and AI services.
 
@@ -56,7 +56,7 @@ ${context.length > 0 ? `I'm currently searching through ${context.length} releva
 
 *${agentName || "Vector Search"}*`;
     }
-    
+
     if (queryLower.includes("hello") || queryLower.includes("hi") || queryLower.includes("hey")) {
         return `Hello! 👋 I'm your RAG Assistant. I can help you search through your documents and find relevant information.
 
@@ -92,7 +92,7 @@ ${context.length > 0 ? `\n✅ Found ${context.length} document(s) matching your 
         const topDoc = context[0];
         const source = (topDoc.metadata?.source as string) || "your documents";
         const preview = topDoc.content?.slice(0, 500) || "";
-        
+
         const contextSummary = context
             .slice(0, 3)
             .map((c, i) => {
@@ -145,9 +145,9 @@ async function mcpRequest(
             params,
         }),
     });
-    
+
     const text = await response.text();
-    
+
     // Parse SSE or JSON response
     if (text.includes("data: ")) {
         const lines = text.split("\n");
@@ -161,7 +161,7 @@ async function mcpRequest(
             }
         }
     }
-    
+
     return JSON.parse(text);
 }
 
@@ -174,23 +174,23 @@ async function callHttpAgent(
     authHeader?: string
 ): Promise<string> {
     logger.info(`Calling HTTP agent: ${agentName} at ${url}`);
-    
+
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream",
     };
-    
+
     // Add authorization header if provided
     if (authHeader) {
-        headers["Authorization"] = authHeader.startsWith("Bearer ") 
-            ? authHeader 
+        headers["Authorization"] = authHeader.startsWith("Bearer ")
+            ? authHeader
             : `Bearer ${authHeader}`;
     }
-    
+
     // Step 1: List available tools
     logger.info("Fetching available MCP tools...");
     let tools: { name: string; description?: string }[] = [];
-    
+
     try {
         const toolsResponse = await mcpRequest(url, "tools/list", {}, headers);
         if (toolsResponse.result?.tools) {
@@ -200,38 +200,38 @@ async function callHttpAgent(
     } catch (err) {
         logger.warn("Could not list tools, will try direct call");
     }
-    
+
     // Step 2: Handle n8n MCP server (management API)
     const hasSearchWorkflows = tools.some(t => t.name === "search_workflows");
     const hasExecuteWorkflow = tools.some(t => t.name === "execute_workflow");
-    
+
     if (hasSearchWorkflows && hasExecuteWorkflow) {
         logger.info("Detected n8n MCP management server, using workflow execution flow");
-        
+
         try {
             // Step 2a: Search for workflows
             const searchResponse = await mcpRequest(url, "tools/call", {
                 name: "search_workflows",
                 arguments: { query: "", active: true },
             }, headers);
-            
+
             if (searchResponse.error) {
                 throw new Error(`Failed to search workflows: ${searchResponse.error.message}`);
             }
-            
+
             // Parse workflow list from response
             let workflows: { id: string; name: string }[] = [];
             const searchResult = searchResponse.result;
-            
+
             if (searchResult?.content) {
-                const contentStr = Array.isArray(searchResult.content) 
+                const contentStr = Array.isArray(searchResult.content)
                     ? searchResult.content.map((c: any) => c.text || "").join("")
                     : typeof searchResult.content === "string" ? searchResult.content : JSON.stringify(searchResult.content);
-                
+
                 // Try to parse workflow IDs from the response
                 const idMatches = contentStr.match(/ID:\s*(\w+)/g) || [];
                 const nameMatches = contentStr.match(/Name:\s*([^\n,]+)/g) || [];
-                
+
                 for (let i = 0; i < idMatches.length; i++) {
                     const id = idMatches[i]?.replace("ID:", "").trim();
                     const name = nameMatches[i]?.replace("Name:", "").trim() || `Workflow ${i + 1}`;
@@ -240,15 +240,15 @@ async function callHttpAgent(
                     }
                 }
             }
-            
+
             if (workflows.length === 0) {
                 return `No active workflows found in n8n. Please activate a workflow to use for RAG queries.\n\n**Available n8n MCP tools:**\n${tools.map(t => `- ${t.name}: ${t.description || ""}`).join("\n")}`;
             }
-            
+
             // Step 2b: Execute the first active workflow with the query
             const workflowToUse = workflows[0];
             logger.info(`Executing workflow: ${workflowToUse.name} (${workflowToUse.id})`);
-            
+
             const executeResponse = await mcpRequest(url, "tools/call", {
                 name: "execute_workflow",
                 arguments: {
@@ -261,11 +261,11 @@ async function callHttpAgent(
                     },
                 },
             }, headers);
-            
+
             if (executeResponse.error) {
                 throw new Error(`Workflow execution failed: ${executeResponse.error.message}`);
             }
-            
+
             // Parse execution result
             const execResult = executeResponse.result;
             if (execResult?.content) {
@@ -274,17 +274,22 @@ async function callHttpAgent(
                 }
                 return typeof execResult.content === "string" ? execResult.content : JSON.stringify(execResult.content, null, 2);
             }
-            
+
             return execResult ? JSON.stringify(execResult, null, 2) : "Workflow executed but returned no content.";
-            
+
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : "Unknown error";
             logger.error(`n8n workflow execution failed: ${errorMsg}`);
-            
+
             // Return helpful message about n8n setup
+            let helpfulHint = "";
+            if (errorMsg.includes("Unused Respond to Webhook node")) {
+                helpfulHint = "\n\n💡 **Hint:** Your n8n workflow has a 'Respond to Webhook' node, but the execution path didn't reach it. Check your workflow logic to ensure the response node is executed.";
+            }
+
             return `**Could not execute n8n workflow.**
 
-Error: ${errorMsg}
+Error: ${errorMsg}${helpfulHint}
 
 **To use n8n for RAG queries, you have two options:**
 
@@ -302,10 +307,10 @@ Error: ${errorMsg}
 *${agentName}*`;
         }
     }
-    
+
     // Step 3: Try direct tool call for non-n8n MCP servers
     let toolToUse = tools.length > 0 ? tools[0] : null;
-    
+
     // Prefer tools that seem related to chat/query/AI
     if (tools.length > 1) {
         const preferredNames = ["chat", "message", "ask", "query", "ai", "assistant", "agent", "test", "execute"];
@@ -314,10 +319,10 @@ Error: ${errorMsg}
             toolToUse = preferred;
         }
     }
-    
+
     if (toolToUse) {
         logger.info(`Calling tool: ${toolToUse.name}`);
-        
+
         const toolArgs: Record<string, unknown> = {
             message: query,
             query: query,
@@ -326,21 +331,21 @@ Error: ${errorMsg}
             prompt: query,
             question: query,
         };
-        
+
         if (context.length > 0) {
             toolArgs.context = context.map(c => c.content).join("\n\n");
         }
-        
+
         const toolResponse = await mcpRequest(url, "tools/call", {
             name: toolToUse.name,
             arguments: toolArgs,
         }, headers);
-        
+
         if (toolResponse.error) {
             const toolList = tools.map(t => `- **${t.name}**${t.description ? `: ${t.description}` : ""}`).join("\n");
             throw new Error(`Tool "${toolToUse.name}" failed: ${toolResponse.error.message}\n\nAvailable tools:\n${toolList}`);
         }
-        
+
         const result = toolResponse.result;
         if (result?.content) {
             if (Array.isArray(result.content)) {
@@ -348,18 +353,18 @@ Error: ${errorMsg}
             }
             return typeof result.content === "string" ? result.content : JSON.stringify(result.content);
         }
-        
+
         return result ? JSON.stringify(result, null, 2) : "Tool executed successfully.";
     }
-    
+
     // No tools available
     if (tools.length === 0) {
         logger.warn("No MCP tools found on server");
     }
-    
+
     // No tools available - try simple webhook format
     logger.info("No MCP tools found, trying webhook format...");
-    
+
     const webhookResponse = await fetch(url, {
         method: "POST",
         headers: {
@@ -370,82 +375,82 @@ Error: ${errorMsg}
             query,
             message: query,
             context: context.map((c) => ({
-                content: c.content,
+                content: c.content || "",
                 score: c.score,
                 source: c.metadata?.source,
             })),
         }),
     });
-    
+
     if (!webhookResponse.ok) {
         const errorText = await webhookResponse.text().catch(() => "Unknown error");
         throw new Error(`Agent returned ${webhookResponse.status}: ${errorText}`);
     }
-    
+
     const data = await webhookResponse.json();
-    
+
     // Handle various response formats
-    const response = 
-        data.response || 
-        data.message || 
-        data.content || 
-        data.text || 
-        data.output || 
+    const response =
+        data.response ||
+        data.message ||
+        data.content ||
+        data.text ||
+        data.output ||
         data.result?.content ||
         data.result ||
         data.answer;
-    
+
     if (typeof response === "string") {
         return response;
     } else if (response) {
         return typeof response === "object" ? JSON.stringify(response, null, 2) : String(response);
     }
-    
+
     return JSON.stringify(data, null, 2);
 }
 
 // Extract HTTP URL from config (handles supergateway and other patterns)
 function extractHttpUrl(agent: RAGRequest["agent"]): string | undefined {
     if (!agent) return undefined;
-    
+
     // Direct endpoint
     if (agent.endpoint) return agent.endpoint;
-    
+
     // Config URL fields
     if (agent.config?.webhookUrl) return agent.config.webhookUrl;
     if (agent.config?.url) return agent.config.url;
     if (agent.config?.baseUrl) return agent.config.baseUrl;
-    
+
     // Extract from supergateway args
     if (agent.config?.args && Array.isArray(agent.config.args)) {
         const args = agent.config.args;
-        
+
         // Look for --streamableHttp or --sse followed by URL
-        const streamableIndex = args.findIndex((arg: string) => 
+        const streamableIndex = args.findIndex((arg: string) =>
             arg === "--streamableHttp" || arg === "--sse"
         );
         if (streamableIndex !== -1 && args[streamableIndex + 1]) {
             return args[streamableIndex + 1];
         }
-        
+
         // Look for any URL in args
-        const urlArg = args.find((arg: string) => 
+        const urlArg = args.find((arg: string) =>
             arg.startsWith("http://") || arg.startsWith("https://")
         );
         if (urlArg) return urlArg;
     }
-    
+
     return undefined;
 }
 
 // Extract auth header from config
 function extractAuthHeader(agent: RAGRequest["agent"]): string | undefined {
     if (!agent) return undefined;
-    
+
     // Direct auth header
     if (agent.authHeader) return agent.authHeader;
     if (agent.config?.authToken) return agent.config.authToken;
-    
+
     // Extract from supergateway args (--header authorization:Bearer xxx)
     if (agent.config?.args && Array.isArray(agent.config.args)) {
         const args = agent.config.args;
@@ -457,7 +462,7 @@ function extractAuthHeader(agent: RAGRequest["agent"]): string | undefined {
             }
         }
     }
-    
+
     return undefined;
 }
 
@@ -478,7 +483,7 @@ export async function POST(request: Request) {
 
         // Step 1: Retrieve relevant context from vector database (if collection specified)
         let context: SearchResult[] = [];
-        
+
         if (collection) {
             try {
                 context = await mockDbClient.search(collection, {
@@ -509,7 +514,7 @@ export async function POST(request: Request) {
             // Extract endpoint and auth from agent config
             const endpoint = extractHttpUrl(agent);
             const authHeader = extractAuthHeader(agent);
-            
+
             if (endpoint) {
                 try {
                     logger.info(`Calling agent ${agentName} at ${endpoint} (auth: ${authHeader ? "yes" : "no"})`);

@@ -146,7 +146,7 @@ export function EditConnectionModal({
         if (connection) {
             setName(connection.name);
             // Extract current config values
-            const config = connection.config as Record<string, unknown>;
+            const config = connection.config as unknown as Record<string, unknown>;
             const values: Record<string, string | boolean> = {};
             fields.forEach((field) => {
                 if (config[field.name] !== undefined) {
@@ -181,7 +181,7 @@ export function EditConnectionModal({
 
             await onSave(connection.id, {
                 name,
-                config: config as ConnectionConfig["config"],
+                config: config as unknown as ConnectionConfig["config"],
                 lastSync: new Date(),
             });
             onOpenChange(false);

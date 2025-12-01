@@ -22,6 +22,10 @@ export interface ConnectionsSlice {
     removeWebhookConnection: (id: string) => void;
     updateWebhookConnection: (id: string, updates: Partial<WebhookConnection>) => void;
     getWebhookConnection: (id: string) => WebhookConnection | undefined;
+
+    // Active connection state
+    activeConnectionId: string | null;
+    setActiveConnection: (id: string | null) => void;
 }
 
 export const createConnectionsSlice: StateCreator<ConnectionsSlice> = (set, get) => ({
@@ -69,4 +73,8 @@ export const createConnectionsSlice: StateCreator<ConnectionsSlice> = (set, get)
         )
     })),
     getWebhookConnection: (id) => get().webhookConnections.find((c) => c.id === id),
+
+    // Active connection state
+    activeConnectionId: null,
+    setActiveConnection: (id: string | null) => set({ activeConnectionId: id }),
 });

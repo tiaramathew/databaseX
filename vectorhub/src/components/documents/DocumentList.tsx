@@ -50,7 +50,7 @@ const getDocumentTitle = (doc: VectorDocument) => {
     return (
         (doc.metadata?.title as string) ||
         (doc.metadata?.source as string) ||
-        doc.id.slice(0, 8) + "..."
+        (doc.id || "unknown").slice(0, 8) + "..."
     );
 };
 
@@ -141,7 +141,7 @@ export function DocumentList({ documents, onDelete }: DocumentListProps) {
                                                             className="h-8 w-8 text-destructive hover:text-destructive"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                onDelete(doc.id);
+                                                                onDelete(doc.id || "");
                                                             }}
                                                         >
                                                             <Trash2 className="h-4 w-4" />

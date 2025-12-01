@@ -24,6 +24,7 @@ import { Plus, Layers, Loader2 } from "lucide-react";
 
 interface CreateCollectionModalProps {
     onSubmit: (config: CreateCollectionConfig) => Promise<void> | void;
+    disabled?: boolean;
 }
 
 const EMBEDDING_PRESETS = [
@@ -33,7 +34,7 @@ const EMBEDDING_PRESETS = [
     { label: "Custom", value: "custom" },
 ];
 
-export function CreateCollectionModal({ onSubmit }: CreateCollectionModalProps) {
+export function CreateCollectionModal({ onSubmit, disabled }: CreateCollectionModalProps) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
     const [dimensionPreset, setDimensionPreset] = useState("1536");
@@ -76,7 +77,7 @@ export function CreateCollectionModal({ onSubmit }: CreateCollectionModalProps) 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button>
+                <Button disabled={disabled}>
                     <Plus className="mr-2 h-4 w-4" />
                     Create Collection
                 </Button>

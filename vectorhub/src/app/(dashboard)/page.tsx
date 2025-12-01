@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "@/store";
-import { useHydratedStore } from "@/store/hooks";
+import { useHydration } from "@/store/hooks";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,8 +71,8 @@ interface ActivityItem {
 }
 
 export default function DashboardPage() {
-    const hydrated = useHydratedStore();
-    
+    const hydrated = useHydration();
+
     // Access store state
     const connections = useStore((state) => state.connections);
     const collections = useStore((state) => state.collections);
@@ -457,12 +457,12 @@ export default function DashboardPage() {
                                                     activity.type === "connection"
                                                         ? "bg-blue-500/10"
                                                         : activity.type === "collection"
-                                                        ? "bg-emerald-500/10"
-                                                        : activity.type === "document"
-                                                        ? "bg-amber-500/10"
-                                                        : activity.type === "mcp"
-                                                        ? "bg-purple-500/10"
-                                                        : "bg-pink-500/10"
+                                                            ? "bg-emerald-500/10"
+                                                            : activity.type === "document"
+                                                                ? "bg-amber-500/10"
+                                                                : activity.type === "mcp"
+                                                                    ? "bg-purple-500/10"
+                                                                    : "bg-pink-500/10"
                                                 )}
                                             >
                                                 <activity.icon
@@ -471,12 +471,12 @@ export default function DashboardPage() {
                                                         activity.type === "connection"
                                                             ? "text-blue-500"
                                                             : activity.type === "collection"
-                                                            ? "text-emerald-500"
-                                                            : activity.type === "document"
-                                                            ? "text-amber-500"
-                                                            : activity.type === "mcp"
-                                                            ? "text-purple-500"
-                                                            : "text-pink-500"
+                                                                ? "text-emerald-500"
+                                                                : activity.type === "document"
+                                                                    ? "text-amber-500"
+                                                                    : activity.type === "mcp"
+                                                                        ? "text-purple-500"
+                                                                        : "text-pink-500"
                                                     )}
                                                 />
                                             </div>
@@ -688,8 +688,8 @@ export default function DashboardPage() {
                                                         conn.status === "connected"
                                                             ? "text-emerald-500 border-emerald-500/30"
                                                             : conn.status === "error"
-                                                            ? "text-red-500 border-red-500/30"
-                                                            : "text-zinc-500"
+                                                                ? "text-red-500 border-red-500/30"
+                                                                : "text-zinc-500"
                                                     )}
                                                 >
                                                     {conn.status}

@@ -61,7 +61,12 @@ export class MCPAdapter implements VectorDBAdapter {
             headers["Authorization"] = `Bearer ${this.config.authToken}`;
         }
 
-        const response = await fetch(this.config.serverUrl, {
+        const url = this.config.webhookUrl || this.config.url;
+        if (!url) {
+            throw new Error("No URL configured for MCP connection");
+        }
+
+        const response = await fetch(url, {
             method: "POST",
             headers,
             body: JSON.stringify(request),
@@ -82,7 +87,8 @@ export class MCPAdapter implements VectorDBAdapter {
 
     async connect(config: ConnectionConfig): Promise<void> {
         this.config = config.config as MCPConfig;
-        console.log(`MCP connecting to ${this.config.serverUrl}...`);
+        const url = this.config.webhookUrl || this.config.url || "unknown";
+        console.log(`MCP connecting to ${url}...`);
 
         try {
             await this.callMCP("initialize", {
@@ -127,9 +133,9 @@ export class MCPAdapter implements VectorDBAdapter {
         return this.status;
     }
 
-    private checkCapability(capability: keyof MCPConfig["capabilities"]): void {
-        if (!this.config?.capabilities[capability]) {
-            throw new Error(`MCP server does not support ${capability}`);
+    private checkCapability(capability: string): void {
+        if (!this.config?.capabilities?.tools) {
+            throw new Error(`MCP server does not support tools (required for ${capability})`);
         }
     }
 
@@ -191,17 +197,17 @@ export class MCPAdapter implements VectorDBAdapter {
 
     async addDocuments(collection: string, documents: VectorDocument[]): Promise<string[]> {
         this.checkCapability("vectorCreate");
-        
+
         const result = await this.callMCP<{ ids: string[] }>("tools/call", {
             name: "vector_add_documents",
             arguments: {
                 collection,
                 documents,
-                embeddingModel: this.config?.modelPreferences?.embeddingModel,
-                dimensions: this.config?.modelPreferences?.dimensions,
+                embeddingModel: (this.config as any)?.modelPreferences?.embeddingModel,
+                dimensions: (this.config as any)?.modelPreferences?.dimensions,
             },
         });
-        
+
         return result.ids || documents.map((_, i) => `mcp-doc-${Date.now()}-${i}`);
     }
 
