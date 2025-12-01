@@ -289,12 +289,14 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
             const parsed = JSON.parse(json);
             setJsonError(null);
             
-            // Handle the format: { "servers": { "name": { ... } } }
-            if (parsed.servers) {
-                const serverNames = Object.keys(parsed.servers);
+            // Determine the servers object (supports both "servers" and "mcpServers" formats)
+            const serversObj = parsed.servers || parsed.mcpServers;
+            
+            if (serversObj) {
+                const serverNames = Object.keys(serversObj);
                 if (serverNames.length > 0) {
                     const serverName = serverNames[0];
-                    const serverConfig = parsed.servers[serverName];
+                    const serverConfig = serversObj[serverName];
                     
                     setName(serverName);
                     setTransportType(serverConfig.type || "stdio");
@@ -309,6 +311,26 @@ export function MCPConnectionForm({ onSubmit, onCancel }: MCPConnectionFormProps
                             value: value as string,
                         }));
                         setEnvVars(envArray);
+                        
+                        // Auto-extract webhook URL from supergateway args
+                        if (serverConfig.args && Array.isArray(serverConfig.args)) {
+                            const args = serverConfig.args as string[];
+                            const streamableIndex = args.findIndex((arg: string) => 
+                                arg === "--streamableHttp" || arg === "--sse"
+                            );
+                            if (streamableIndex !== -1 && args[streamableIndex + 1]) {
+                                setWebhookUrl(args[streamableIndex + 1]);
+                            }
+                            
+                            // Extract auth token from --header
+                            const headerIndex = args.findIndex((arg: string) => arg === "--header");
+                            if (headerIndex !== -1 && args[headerIndex + 1]) {
+                                const headerValue = args[headerIndex + 1];
+                                if (headerValue.toLowerCase().startsWith("authorization:")) {
+                                    setAuthToken(headerValue.split(":").slice(1).join(":").trim());
+                                }
+                            }
+                        }
                     }
                 }
             } else {
