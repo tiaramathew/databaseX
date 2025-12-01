@@ -226,18 +226,27 @@ export interface WebhookConfig {
 }
 
 export interface MCPConfig {
-    serverUrl: string;
-    serverName: string;
+    // Transport type
+    type: 'stdio' | 'sse';
+    
+    // For stdio transport
+    command?: string;
+    args?: string[];
+    env?: Record<string, string>;
+    
+    // For SSE transport
+    url?: string;
+    
+    // Common options
+    serverName?: string;
     authToken?: string;
-    capabilities: {
-        vectorCreate: boolean;
-        vectorUpdate: boolean;
-        vectorDelete: boolean;
-        vectorSearch: boolean;
-    };
-    modelPreferences?: {
-        embeddingModel?: string;
-        dimensions?: number;
+    timeout?: number;
+    
+    // Capabilities (auto-detected or manually set)
+    capabilities?: {
+        tools?: boolean;
+        resources?: boolean;
+        prompts?: boolean;
     };
 }
 
