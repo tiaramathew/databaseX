@@ -201,42 +201,134 @@ async function callHttpAgent(
         logger.warn("Could not list tools, will try direct call");
     }
     
-    // Step 2: Find a suitable tool to call
-    // First, look for any tool (n8n workflows become tools with workflow names)
+    // Step 2: Handle n8n MCP server (management API)
+    const hasSearchWorkflows = tools.some(t => t.name === "search_workflows");
+    const hasExecuteWorkflow = tools.some(t => t.name === "execute_workflow");
+    
+    if (hasSearchWorkflows && hasExecuteWorkflow) {
+        logger.info("Detected n8n MCP management server, using workflow execution flow");
+        
+        try {
+            // Step 2a: Search for workflows
+            const searchResponse = await mcpRequest(url, "tools/call", {
+                name: "search_workflows",
+                arguments: { query: "", active: true },
+            }, headers);
+            
+            if (searchResponse.error) {
+                throw new Error(`Failed to search workflows: ${searchResponse.error.message}`);
+            }
+            
+            // Parse workflow list from response
+            let workflows: { id: string; name: string }[] = [];
+            const searchResult = searchResponse.result;
+            
+            if (searchResult?.content) {
+                const contentStr = Array.isArray(searchResult.content) 
+                    ? searchResult.content.map((c: any) => c.text || "").join("")
+                    : typeof searchResult.content === "string" ? searchResult.content : JSON.stringify(searchResult.content);
+                
+                // Try to parse workflow IDs from the response
+                const idMatches = contentStr.match(/ID:\s*(\w+)/g) || [];
+                const nameMatches = contentStr.match(/Name:\s*([^\n,]+)/g) || [];
+                
+                for (let i = 0; i < idMatches.length; i++) {
+                    const id = idMatches[i]?.replace("ID:", "").trim();
+                    const name = nameMatches[i]?.replace("Name:", "").trim() || `Workflow ${i + 1}`;
+                    if (id) {
+                        workflows.push({ id, name });
+                    }
+                }
+            }
+            
+            if (workflows.length === 0) {
+                return `No active workflows found in n8n. Please activate a workflow to use for RAG queries.\n\n**Available n8n MCP tools:**\n${tools.map(t => `- ${t.name}: ${t.description || ""}`).join("\n")}`;
+            }
+            
+            // Step 2b: Execute the first active workflow with the query
+            const workflowToUse = workflows[0];
+            logger.info(`Executing workflow: ${workflowToUse.name} (${workflowToUse.id})`);
+            
+            const executeResponse = await mcpRequest(url, "tools/call", {
+                name: "execute_workflow",
+                arguments: {
+                    workflowId: workflowToUse.id,
+                    data: {
+                        message: query,
+                        query: query,
+                        input: query,
+                        context: context.length > 0 ? context.map(c => c.content).join("\n\n") : undefined,
+                    },
+                },
+            }, headers);
+            
+            if (executeResponse.error) {
+                throw new Error(`Workflow execution failed: ${executeResponse.error.message}`);
+            }
+            
+            // Parse execution result
+            const execResult = executeResponse.result;
+            if (execResult?.content) {
+                if (Array.isArray(execResult.content)) {
+                    return execResult.content.map((c: any) => c.text || c.content || JSON.stringify(c)).join("\n");
+                }
+                return typeof execResult.content === "string" ? execResult.content : JSON.stringify(execResult.content, null, 2);
+            }
+            
+            return execResult ? JSON.stringify(execResult, null, 2) : "Workflow executed but returned no content.";
+            
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : "Unknown error";
+            logger.error(`n8n workflow execution failed: ${errorMsg}`);
+            
+            // Return helpful message about n8n setup
+            return `**Could not execute n8n workflow.**
+
+Error: ${errorMsg}
+
+**To use n8n for RAG queries, you have two options:**
+
+**Option 1: Use n8n Webhook (Recommended)**
+1. Create a workflow with a Webhook trigger
+2. Add an AI node (OpenAI, Claude, etc.)
+3. Copy the webhook URL
+4. Add it to your n8n connection's "Webhook URL" field
+
+**Option 2: Use n8n MCP Workflow Execution**
+1. Create and activate a workflow in n8n
+2. The workflow should accept \`message\` or \`query\` as input
+3. Make sure the workflow is Active
+
+*${agentName}*`;
+        }
+    }
+    
+    // Step 3: Try direct tool call for non-n8n MCP servers
     let toolToUse = tools.length > 0 ? tools[0] : null;
     
-    // If multiple tools, prefer ones that seem related to chat/query/AI
+    // Prefer tools that seem related to chat/query/AI
     if (tools.length > 1) {
-        const preferredNames = ["chat", "message", "ask", "query", "ai", "assistant", "agent", "test"];
+        const preferredNames = ["chat", "message", "ask", "query", "ai", "assistant", "agent", "test", "execute"];
         const preferred = tools.find(t => preferredNames.some(name => t.name.toLowerCase().includes(name)));
         if (preferred) {
             toolToUse = preferred;
         }
     }
     
-    // Step 3: Call the tool or try alternative methods
     if (toolToUse) {
         logger.info(`Calling tool: ${toolToUse.name}`);
         
-        // Try calling with various argument formats that n8n workflows might expect
-        const toolArgs: Record<string, unknown> = {};
+        const toolArgs: Record<string, unknown> = {
+            message: query,
+            query: query,
+            text: query,
+            input: query,
+            prompt: query,
+            question: query,
+        };
         
-        // Add the query in multiple common field names
-        toolArgs.message = query;
-        toolArgs.query = query;
-        toolArgs.text = query;
-        toolArgs.input = query;
-        toolArgs.prompt = query;
-        toolArgs.question = query;
-        
-        // Add context if available
         if (context.length > 0) {
             toolArgs.context = context.map(c => c.content).join("\n\n");
-            toolArgs.documents = context.map(c => ({
-                content: c.content,
-                source: c.metadata?.source,
-                score: c.score,
-            }));
         }
         
         const toolResponse = await mcpRequest(url, "tools/call", {
@@ -245,12 +337,10 @@ async function callHttpAgent(
         }, headers);
         
         if (toolResponse.error) {
-            // If the tool call failed, show available tools
             const toolList = tools.map(t => `- **${t.name}**${t.description ? `: ${t.description}` : ""}`).join("\n");
             throw new Error(`Tool "${toolToUse.name}" failed: ${toolResponse.error.message}\n\nAvailable tools:\n${toolList}`);
         }
         
-        // Parse tool response
         const result = toolResponse.result;
         if (result?.content) {
             if (Array.isArray(result.content)) {
@@ -259,15 +349,10 @@ async function callHttpAgent(
             return typeof result.content === "string" ? result.content : JSON.stringify(result.content);
         }
         
-        // Return stringified result
-        if (result) {
-            return typeof result === "string" ? result : JSON.stringify(result, null, 2);
-        }
-        
-        return "Tool executed successfully but returned no content.";
+        return result ? JSON.stringify(result, null, 2) : "Tool executed successfully.";
     }
     
-    // No tools available - list what we found
+    // No tools available
     if (tools.length === 0) {
         logger.warn("No MCP tools found on server");
     }
