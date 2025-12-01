@@ -12,6 +12,7 @@ interface CollectionCardProps {
     onDelete: (name: string) => void;
     onEdit: (name: string) => void;
     onViewStats: (name: string) => void;
+    onViewDetails?: (collection: CollectionInfo) => void;
 }
 
 const metricColors: Record<string, string> = {
@@ -25,11 +26,15 @@ export function CollectionCard({
     onDelete,
     onEdit,
     onViewStats,
+    onViewDetails,
 }: CollectionCardProps) {
     const metricColor = metricColors[collection.distanceMetric] || metricColors.cosine;
 
     return (
-        <Card className="card-hover">
+        <Card 
+            className="card-hover cursor-pointer transition-all hover:border-primary/50"
+            onClick={() => onViewDetails?.(collection)}
+        >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                     <div className="flex items-center space-x-2">
@@ -54,7 +59,7 @@ export function CollectionCard({
                     </span>
                 </div>
             </CardContent>
-            <CardFooter className="flex justify-between pt-0">
+            <CardFooter className="flex justify-between pt-0" onClick={(e) => e.stopPropagation()}>
                 <Button
                     variant="ghost"
                     size="sm"

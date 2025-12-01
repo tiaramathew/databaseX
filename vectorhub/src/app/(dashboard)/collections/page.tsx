@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { useStore } from "@/store";
 import { CollectionCard } from "@/components/collections/CollectionCard";
 import { CreateCollectionModal } from "@/components/collections/CreateCollectionModal";
+import { CollectionDetails } from "@/components/collections/CollectionDetails";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SkeletonCard } from "@/components/ui/skeleton";
-import { CreateCollectionConfig } from "@/lib/db/adapters/base";
+import { CreateCollectionConfig, CollectionInfo } from "@/lib/db/adapters/base";
 import {
     createCollectionApi,
     deleteCollectionApi,
@@ -40,6 +41,13 @@ export default function CollectionsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [selectedCollection, setSelectedCollection] = useState<CollectionInfo | null>(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
+
+    const handleViewDetails = useCallback((collection: CollectionInfo) => {
+        setSelectedCollection(collection);
+        setDetailsOpen(true);
+    }, []);
 
     useEffect(() => {
         let mounted = true;
@@ -185,6 +193,7 @@ export default function CollectionsPage() {
                                 onDelete={handleDelete}
                                 onEdit={handleEdit}
                                 onViewStats={handleViewStats}
+                                onViewDetails={handleViewDetails}
                             />
                         </motion.div>
                     ))}
@@ -215,6 +224,16 @@ export default function CollectionsPage() {
                 variant="destructive"
                 onConfirm={handleDeleteConfirm}
                 isLoading={isDeleting}
+            />
+
+            <CollectionDetails
+                collection={selectedCollection}
+                open={detailsOpen}
+                onOpenChange={setDetailsOpen}
+                onDelete={(name) => {
+                    setDetailsOpen(false);
+                    setDeleteTarget(name);
+                }}
             />
         </>
     );
