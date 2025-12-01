@@ -6,6 +6,11 @@ const nextConfig = {
     // Optimize production builds
     poweredByHeader: false,
 
+    // Allow all hosts for Replit proxy
+    async rewrites() {
+        return [];
+    },
+
     // Security headers
     async headers() {
         return [
