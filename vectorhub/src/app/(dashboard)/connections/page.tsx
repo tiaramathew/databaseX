@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import { useStore } from "@/store";
 import { ConnectionCard } from "@/components/connections/ConnectionCard";
 import { ConnectionForm } from "@/components/connections/ConnectionForm";
+import { WebhookConnectionForm } from "@/components/connections/WebhookConnectionForm";
+import { MCPConnectionForm } from "@/components/connections/MCPConnectionForm";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Database } from "lucide-react";
+import { Plus, Database, Webhook, Cpu } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -17,6 +19,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConnectionConfig } from "@/types/connections";
 
 const containerVariants = {
@@ -120,17 +123,47 @@ export default function ConnectionsPage() {
                                 Add Connection
                             </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-2xl">
                             <DialogHeader>
                                 <DialogTitle>Add Connection</DialogTitle>
                                 <DialogDescription>
-                                    Connect to a new vector database instance.
+                                    Connect to a vector database, webhook, or MCP server.
                                 </DialogDescription>
                             </DialogHeader>
-                            <ConnectionForm
-                                onSubmit={handleAddConnection}
-                                onCancel={() => setOpen(false)}
-                            />
+                            <Tabs defaultValue="database" className="w-full">
+                                <TabsList className="grid w-full grid-cols-3">
+                                    <TabsTrigger value="database" className="flex items-center gap-2">
+                                        <Database className="h-4 w-4" />
+                                        Database
+                                    </TabsTrigger>
+                                    <TabsTrigger value="webhook" className="flex items-center gap-2">
+                                        <Webhook className="h-4 w-4" />
+                                        Webhook
+                                    </TabsTrigger>
+                                    <TabsTrigger value="mcp" className="flex items-center gap-2">
+                                        <Cpu className="h-4 w-4" />
+                                        MCP
+                                    </TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="database" className="mt-4">
+                                    <ConnectionForm
+                                        onSubmit={handleAddConnection}
+                                        onCancel={() => setOpen(false)}
+                                    />
+                                </TabsContent>
+                                <TabsContent value="webhook" className="mt-4">
+                                    <WebhookConnectionForm
+                                        onSubmit={handleAddConnection}
+                                        onCancel={() => setOpen(false)}
+                                    />
+                                </TabsContent>
+                                <TabsContent value="mcp" className="mt-4">
+                                    <MCPConnectionForm
+                                        onSubmit={handleAddConnection}
+                                        onCancel={() => setOpen(false)}
+                                    />
+                                </TabsContent>
+                            </Tabs>
                         </DialogContent>
                     </Dialog>
                 </motion.div>

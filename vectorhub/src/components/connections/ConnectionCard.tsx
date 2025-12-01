@@ -1,10 +1,10 @@
 "use client";
 
-import { ConnectionConfig } from "@/types/connections";
+import { ConnectionConfig, VectorDBType } from "@/types/connections";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Database, Trash2, Edit, RefreshCw, Loader2 } from "lucide-react";
+import { Database, Trash2, Edit, RefreshCw, Loader2, Webhook, Cpu } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,19 @@ const dbTypeLabels: Record<string, string> = {
     qdrant: "Qdrant",
     redis: "Redis",
     upstash: "Upstash",
+    webhook: "Webhook",
+    mcp: "MCP Server",
+};
+
+const getConnectionIcon = (type: VectorDBType) => {
+    switch (type) {
+        case "webhook":
+            return <Webhook className="h-4 w-4 text-muted-foreground" />;
+        case "mcp":
+            return <Cpu className="h-4 w-4 text-muted-foreground" />;
+        default:
+            return <Database className="h-4 w-4 text-muted-foreground" />;
+    }
 };
 
 export function ConnectionCard({
@@ -60,7 +73,7 @@ export function ConnectionCard({
                 <CardTitle className="text-sm font-medium">
                     <div className="flex items-center space-x-2">
                         <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                            <Database className="h-4 w-4 text-muted-foreground" />
+                            {getConnectionIcon(connection.type)}
                         </div>
                         <span className="truncate">{connection.name}</span>
                     </div>

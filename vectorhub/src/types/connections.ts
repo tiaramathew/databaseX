@@ -6,7 +6,9 @@ export type VectorDBType =
     | 'pinecone'
     | 'qdrant'
     | 'redis'
-    | 'upstash';
+    | 'upstash'
+    | 'webhook'
+    | 'mcp';
 
 export interface ConnectionConfig {
     id: string;
@@ -22,7 +24,9 @@ export interface ConnectionConfig {
     | PineconeConfig
     | QdrantConfig
     | RedisConfig
-    | UpstashConfig;
+    | UpstashConfig
+    | WebhookConfig
+    | MCPConfig;
 }
 
 export interface MongoDBAtlasConfig {
@@ -79,4 +83,36 @@ export interface RedisConfig {
 export interface UpstashConfig {
     url: string;
     token: string;
+}
+
+export interface WebhookConfig {
+    baseUrl: string;
+    authType: 'none' | 'api_key' | 'bearer' | 'basic';
+    authValue?: string;
+    headers?: Record<string, string>;
+    endpoints: {
+        create: string;
+        read: string;
+        update: string;
+        delete: string;
+        search: string;
+    };
+    retryCount: number;
+    timeoutMs: number;
+}
+
+export interface MCPConfig {
+    serverUrl: string;
+    serverName: string;
+    authToken?: string;
+    capabilities: {
+        vectorCreate: boolean;
+        vectorUpdate: boolean;
+        vectorDelete: boolean;
+        vectorSearch: boolean;
+    };
+    modelPreferences?: {
+        embeddingModel?: string;
+        dimensions?: number;
+    };
 }
