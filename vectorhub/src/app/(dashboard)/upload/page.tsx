@@ -229,14 +229,46 @@ export default function UploadPage() {
                 for (const file of files) {
                     let content = "";
 
+                    // Handle PDF and DOCX files via server-side parsing
+                    if (file.type === "application/pdf" ||
+                        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                        file.name.endsWith(".docx")) {
+
+                        const formData = new FormData();
+                        formData.append("file", file);
+
+                        try {
+                            const res = await fetch("/api/parse", {
+                                method: "POST",
+                                body: formData,
+                            });
+
+                            if (!res.ok) {
+                                throw new Error(`Failed to parse file: ${res.statusText}`);
+                            }
+
+                            const data = await res.json();
+                            content = data.text;
+
+                            if (!content || content.trim().length === 0) {
+                                toast.warning(`No text found in ${file.name}`, {
+                                    description: "The file might be empty or contain only images."
+                                });
+                                content = `[Empty content for ${file.name}]`;
+                            }
+                        } catch (err) {
+                            console.error("File parsing failed:", err);
+                            toast.error(`Failed to parse ${file.name}`);
+                            content = `[Failed to parse content for ${file.name}]`;
+                        }
+                    }
                     // Simple text reading for supported text formats
-                    if (file.type === "text/plain" || file.name.endsWith(".md") || file.name.endsWith(".json") || file.name.endsWith(".csv") || file.name.endsWith(".txt")) {
+                    else if (file.type === "text/plain" || file.name.endsWith(".md") || file.name.endsWith(".json") || file.name.endsWith(".csv") || file.name.endsWith(".txt")) {
                         content = await file.text();
                     } else {
-                        // For binary files, we'd need server-side processing or client-side libraries
+                        // For other binary files, we'd need server-side processing or client-side libraries
                         // For now, we'll use a placeholder or warn
                         content = `[Binary file content placeholder for ${file.name}]`;
-                        // In a real app, you'd upload the file to an endpoint to extract text
                     }
 
                     const chunks = options
