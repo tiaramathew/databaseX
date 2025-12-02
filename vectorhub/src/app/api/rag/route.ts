@@ -519,7 +519,29 @@ Error: ${errorMsg}${helpfulHint}
         throw new Error(`Agent returned ${webhookResponse.status}: ${errorText}`);
     }
 
-    const data = await webhookResponse.json();
+    // Get raw response text first to handle empty responses
+    const rawText = await webhookResponse.text();
+    logger.info(`Webhook raw response (${rawText.length} chars): ${rawText.substring(0, 500)}`);
+    
+    // Handle empty response
+    if (!rawText || rawText.trim() === "") {
+        throw new Error(`n8n webhook returned an empty response. Please check your n8n workflow:
+1. Make sure your workflow has a "Respond to Webhook" node connected to the output
+2. The response node should return JSON with a "response", "message", or "output" field
+3. Check that your workflow execution path reaches the response node
+
+Example response format: { "response": "Your answer here" }`);
+    }
+    
+    // Try to parse as JSON
+    let data;
+    try {
+        data = JSON.parse(rawText);
+    } catch (parseError) {
+        // If not JSON, return the raw text as the response
+        logger.warn(`Response is not JSON, using raw text: ${rawText.substring(0, 200)}`);
+        return rawText;
+    }
 
     // Handle various response formats
     const response =
