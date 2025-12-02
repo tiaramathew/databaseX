@@ -563,10 +563,14 @@ export async function POST(request: Request) {
             const endpoint = extractHttpUrl(agent);
             const authHeader = extractAuthHeader(agent);
 
-            if (endpoint) {
+            if (agent.endpoint === "local") {
+                // Handle built-in local agent
+                response = await handleLocalAgent(query, context);
+                agentUsed = "VectorHub Assistant";
+            } else if (endpoint) {
                 try {
                     logger.info(`Calling agent ${agentName} at ${endpoint} (auth: ${authHeader ? "yes" : "no"})`);
-                    response = await callHttpAgent(endpoint, query, context, agentName, authHeader);
+                    response = await callHttpAgent(endpoint, query, context, agentName, authHeader, body.history);
                     agentUsed = agentName;
                 } catch (err) {
                     const errorMsg = err instanceof Error ? err.message : "Unknown error";
@@ -575,10 +579,6 @@ export async function POST(request: Request) {
                     response += `\n\n⚠️ *Could not reach ${agentName}.*\n*Error: ${errorMsg}*`;
                     agentUsed = `${agentName} (fallback)`;
                 }
-            } else if (agent.endpoint === "local") {
-                // Handle built-in local agent
-                response = await handleLocalAgent(query, context);
-                agentUsed = "VectorHub Assistant";
             } else {
                 // No endpoint - use vector search only
                 response = generateResponse(query, context, "Vector Search");
