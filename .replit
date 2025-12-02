@@ -37,10 +37,6 @@ externalPort = 80
 localPort = 39965
 externalPort = 3000
 
-[[ports]]
-localPort = 42293
-externalPort = 3001
-
 [deployment]
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "cd vectorhub && npm run start"]
