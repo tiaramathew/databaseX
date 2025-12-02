@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { dbClient } from "@/lib/db/client";
 import { logger } from "@/lib/logger";
 import type { SearchResult } from "@/lib/db/adapters/base";
+import OpenAI from "openai";
+
+// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+// This is using Replit's AI Integrations service, which provides OpenAI-compatible API access without requiring your own OpenAI API key.
+const openai = new OpenAI({
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+});
 
 interface RAGRequest {
     query: string;
@@ -32,68 +40,84 @@ interface RAGResponse {
     agentUsed: string;
 }
 
-// Generate an AI-like response based on query and context
-function generateResponse(query: string, context: SearchResult[], agentName?: string): string {
-    const queryLower = query.toLowerCase();
+// Generate an AI response using OpenAI based on query and context
+async function generateAIResponse(
+    query: string, 
+    context: SearchResult[], 
+    agentName?: string,
+    history?: { role: string; content: string }[]
+): Promise<string> {
+    try {
+        // Build context string from retrieved documents
+        let contextStr = "";
+        if (context.length > 0) {
+            contextStr = context
+                .map((c, i) => {
+                    const source = (c.metadata?.source as string) || `Document ${i + 1}`;
+                    return `[Source: ${source}, Score: ${(c.score * 100).toFixed(0)}%]\n${c.content}`;
+                })
+                .join("\n\n---\n\n");
+        }
 
-    // Handle common conversational queries
-    if (queryLower.includes("who are you") || queryLower.includes("what are you")) {
-        return `I'm the RAG Assistant for VectorHub! I help you search through your vector database and retrieve relevant information from your uploaded documents.
+        // Build message history for chat
+        const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+            {
+                role: "system",
+                content: `You are VectorHub Assistant, a helpful AI that answers questions based on the user's documents stored in a vector database.
 
-**My capabilities:**
-- Search your vector database for relevant documents
-- Retrieve context based on semantic similarity
-- Connect to external AI agents (via MCP or Webhook) for intelligent responses
+${context.length > 0 ? `You have access to the following relevant documents retrieved from the database:
 
-${context.length > 0 ? `\nI found ${context.length} document(s) that might be relevant to your question.` : "\nNo documents are currently loaded. Upload some documents to get started!"}
+${contextStr}
 
-*${agentName || "Vector Search"}*`;
+Use these documents to answer the user's question. If the information in the documents is relevant, cite the sources. If the documents don't contain enough information to fully answer, say so and provide what you can based on the available context.` : `No documents were found matching the user's query. Let them know this and offer helpful suggestions like:
+- Uploading relevant documents on the Upload page
+- Selecting a different collection
+- Lowering the minimum similarity score
+- Trying different search terms`}
+
+Be concise, helpful, and conversational. Format your responses using markdown when appropriate.`
+            }
+        ];
+
+        // Add conversation history if provided
+        if (history && history.length > 0) {
+            for (const msg of history.slice(-10)) { // Keep last 10 messages for context
+                if (msg.role === "user" || msg.role === "assistant") {
+                    messages.push({
+                        role: msg.role as "user" | "assistant",
+                        content: msg.content
+                    });
+                }
+            }
+        }
+
+        // Add current query
+        messages.push({
+            role: "user",
+            content: query
+        });
+
+        // Call OpenAI API
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini", // Using a faster, cheaper model for chat
+            messages,
+            max_tokens: 1024,
+            temperature: 0.7,
+        });
+
+        const aiResponse = response.choices[0]?.message?.content || "I couldn't generate a response. Please try again.";
+        
+        return aiResponse;
+    } catch (error) {
+        logger.error("OpenAI API call failed", error instanceof Error ? error : undefined);
+        // Fallback to simple response if AI fails
+        return generateFallbackResponse(query, context, agentName);
     }
+}
 
-    if (queryLower.includes("where are you from") || queryLower.includes("where do you come from")) {
-        return `I'm a RAG (Retrieval-Augmented Generation) assistant built into VectorHub. I run locally in your browser and connect to your configured vector databases and AI services.
-
-${context.length > 0 ? `I'm currently searching through ${context.length} relevant document(s) from your database.` : "I don't have any documents loaded yet - upload some to start exploring!"}
-
-*${agentName || "Vector Search"}*`;
-    }
-
-    if (queryLower.includes("hello") || queryLower.includes("hi") || queryLower.includes("hey")) {
-        return `Hello! 👋 I'm your RAG Assistant. I can help you search through your documents and find relevant information.
-
-**Try asking me:**
-- Questions about your uploaded documents
-- To summarize specific topics
-- To find information about a particular subject
-
-${context.length > 0 ? `\nI found ${context.length} potentially relevant document(s).` : "\n📝 Upload some documents first to unlock my full potential!"}
-
-*${agentName || "Vector Search"}*`;
-    }
-
-    if (queryLower.includes("help") || queryLower.includes("what can you do")) {
-        return `**Here's what I can do:**
-
-1. **Search Documents** - Find relevant passages from your uploaded files
-2. **Semantic Search** - Understand meaning, not just keywords
-3. **Connect AI Agents** - Route queries to external AI services (n8n, Make.com, etc.)
-
-**To get started:**
-1. Upload documents via the Upload page
-2. Select a collection to search
-3. Ask me anything about your documents!
-
-${context.length > 0 ? `\n✅ Found ${context.length} document(s) matching your query.` : "\n⚠️ No documents found. Upload some files to search through!"}
-
-*${agentName || "Vector Search"}*`;
-    }
-
-    // If we have context, provide a more intelligent response
+// Fallback response when AI is unavailable
+function generateFallbackResponse(query: string, context: SearchResult[], agentName?: string): string {
     if (context.length > 0) {
-        const topDoc = context[0];
-        const source = (topDoc.metadata?.source as string) || "your documents";
-        const preview = topDoc.content?.slice(0, 500) || "";
-
         const contextSummary = context
             .slice(0, 3)
             .map((c, i) => {
@@ -107,24 +131,17 @@ ${context.length > 0 ? `\n✅ Found ${context.length} document(s) matching your 
 
 ${contextSummary}
 
----
-📊 *Searched ${context.length} documents with similarity scores from ${(context[context.length - 1]?.score * 100).toFixed(0)}% to ${(context[0]?.score * 100).toFixed(0)}%*
-
-💡 **Tip:** Connect an AI agent (MCP/Webhook) in the Connections page for more intelligent, conversational responses!
-
 *${agentName || "Vector Search"}*`;
     }
 
-    // No context - general response
     return `I received your question: "${query}"
 
 However, I don't have any documents to search through yet, or no documents matched your query.
 
 **To get better results:**
-1. 📤 Upload relevant documents on the Upload page
-2. 📁 Select a collection from the Data Source panel
-3. 🔧 Lower the "Min similarity score" to find more results
-4. 🤖 Connect an AI agent (n8n, Make.com) for intelligent responses
+1. Upload relevant documents on the Upload page
+2. Select a collection from the Data Source panel
+3. Lower the "Min similarity score" to find more results
 
 *${agentName || "Vector Search"}*`;
 }
@@ -450,8 +467,8 @@ async function handleLocalAgent(
         return `I checked the **system clock** for you.\n\nCurrent Time: **${timeString}**\nDate: **${dateString}**`;
     }
 
-    // Default RAG response if no tools matched
-    return generateResponse(query, context, "VectorHub Assistant");
+    // Default RAG response if no tools matched - use AI
+    return generateAIResponse(query, context, "VectorHub Assistant");
 }
 
 // Extract HTTP URL from config (handles supergateway and other patterns)
@@ -555,8 +572,8 @@ export async function POST(request: Request) {
         const agentName = agent?.name || "Vector Search";
 
         if (!agent || agent.type === "mock") {
-            // Use built-in response generator
-            response = generateResponse(query, context, "Vector Search");
+            // Use built-in AI response generator with OpenAI
+            response = await generateAIResponse(query, context, "Vector Search", body.history);
             agentUsed = "Vector Search";
         } else {
             // Extract endpoint and auth from agent config
@@ -575,13 +592,13 @@ export async function POST(request: Request) {
                 } catch (err) {
                     const errorMsg = err instanceof Error ? err.message : "Unknown error";
                     logger.error(`Agent call failed (${agent.type}): ${errorMsg}`);
-                    response = generateResponse(query, context, agentName);
+                    response = await generateAIResponse(query, context, agentName, body.history);
                     response += `\n\n⚠️ *Could not reach ${agentName}.*\n*Error: ${errorMsg}*`;
                     agentUsed = `${agentName} (fallback)`;
                 }
             } else {
-                // No endpoint - use vector search only
-                response = generateResponse(query, context, "Vector Search");
+                // No endpoint - use AI response
+                response = await generateAIResponse(query, context, "Vector Search", body.history);
                 response += `\n\n💡 *No HTTP endpoint configured for ${agentName}. Please add a webhook URL in the connection settings.*`;
                 agentUsed = "Vector Search";
             }
