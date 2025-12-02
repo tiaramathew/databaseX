@@ -295,10 +295,10 @@ async function callHttpAgent(
         logger.info("Detected n8n MCP management server, using workflow execution flow");
 
         try {
-            // Step 2a: Search for workflows
+            // Step 2a: Search for workflows (try without filters first to get all, then filter)
             const searchResponse = await mcpRequest(url, "tools/call", {
                 name: "search_workflows",
-                arguments: { query: "", active: true },
+                arguments: { activeOnly: true },
             }, headers);
 
             if (searchResponse.error) {
@@ -308,24 +308,67 @@ async function callHttpAgent(
             // Parse workflow list from response
             let workflows: { id: string; name: string }[] = [];
             const searchResult = searchResponse.result;
+            
+            logger.info("n8n search_workflows response", { result: searchResult });
 
             if (searchResult?.content) {
                 const contentStr = Array.isArray(searchResult.content)
-                    ? searchResult.content.map((c: any) => c.text || "").join("")
+                    ? searchResult.content.map((c: any) => c.text || c.content || "").join("")
                     : typeof searchResult.content === "string" ? searchResult.content : JSON.stringify(searchResult.content);
 
-                // Try to parse workflow IDs from the response
-                const idMatches = contentStr.match(/ID:\s*(\w+)/g) || [];
-                const nameMatches = contentStr.match(/Name:\s*([^\n,]+)/g) || [];
+                logger.info("Parsed content string", { preview: contentStr.substring(0, 500) });
 
-                for (let i = 0; i < idMatches.length; i++) {
-                    const id = idMatches[i]?.replace("ID:", "").trim();
-                    const name = nameMatches[i]?.replace("Name:", "").trim() || `Workflow ${i + 1}`;
-                    if (id) {
-                        workflows.push({ id, name });
+                // Try to parse as JSON first (n8n might return JSON array)
+                try {
+                    const jsonMatch = contentStr.match(/\[[\s\S]*\]/);
+                    if (jsonMatch) {
+                        const parsed = JSON.parse(jsonMatch[0]);
+                        if (Array.isArray(parsed)) {
+                            workflows = parsed.map((w: any) => ({
+                                id: w.id || w.workflowId || "",
+                                name: w.name || w.title || `Workflow`,
+                            })).filter((w: any) => w.id);
+                            logger.info(`Parsed ${workflows.length} workflows from JSON`);
+                        }
+                    }
+                } catch {
+                    // Not JSON, try regex patterns
+                }
+
+                // Fallback to regex patterns if JSON parsing didn't work
+                if (workflows.length === 0) {
+                    // Try pattern: ID: xxx, Name: xxx
+                    const idMatches = contentStr.match(/ID:\s*(\w+)/gi) || [];
+                    const nameMatches = contentStr.match(/Name:\s*([^\n,\]]+)/gi) || [];
+
+                    for (let i = 0; i < idMatches.length; i++) {
+                        const id = idMatches[i]?.replace(/ID:\s*/i, "").trim();
+                        const name = nameMatches[i]?.replace(/Name:\s*/i, "").trim() || `Workflow ${i + 1}`;
+                        if (id) {
+                            workflows.push({ id, name });
+                        }
+                    }
+
+                    // Also try pattern: "id": "xxx" or id: xxx
+                    if (workflows.length === 0) {
+                        const altIdMatches = contentStr.match(/"id"\s*:\s*"([^"]+)"/gi) || 
+                                            contentStr.match(/id\s*:\s*(\w+)/gi) || [];
+                        const altNameMatches = contentStr.match(/"name"\s*:\s*"([^"]+)"/gi) || [];
+                        
+                        for (let i = 0; i < altIdMatches.length; i++) {
+                            const idMatch = altIdMatches[i].match(/:\s*"?([^"]+)"?/);
+                            const nameMatch = altNameMatches[i]?.match(/:\s*"([^"]+)"/);
+                            const id = idMatch?.[1]?.trim();
+                            const name = nameMatch?.[1]?.trim() || `Workflow ${i + 1}`;
+                            if (id) {
+                                workflows.push({ id, name });
+                            }
+                        }
                     }
                 }
             }
+
+            logger.info(`Found ${workflows.length} active workflows`);
 
             if (workflows.length === 0) {
                 return `No active workflows found in n8n. Please activate a workflow to use for RAG queries.\n\n**Available n8n MCP tools:**\n${tools.map(t => `- ${t.name}: ${t.description || ""}`).join("\n")}`;
