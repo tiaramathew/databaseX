@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileText, AlertCircle, Webhook, Cpu, Database, CheckCircle2, Globe, RefreshCw } from "lucide-react";
+import { Upload, FileText, AlertCircle, Webhook, Cpu, Database, CheckCircle2, Globe, RefreshCw, ChevronDown, Settings2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,6 +72,11 @@ export default function UploadPage() {
 
     const [isUploading, setIsUploading] = useState(false);
     const [isLoadingCollections, setIsLoadingCollections] = useState(false);
+
+    // Chunking settings
+    const [chunkSize, setChunkSize] = useState([1000]);
+    const [chunkOverlap, setChunkOverlap] = useState([200]);
+    const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
     // Fetch collections when connection changes
     useEffect(() => {
@@ -539,6 +546,73 @@ export default function UploadPage() {
             )}
 
             <motion.div variants={itemVariants}>
+                <Collapsible
+                    open={isAdvancedOpen}
+                    onOpenChange={setIsAdvancedOpen}
+                    className="w-full space-y-2"
+                >
+                    <div className="flex items-center justify-between px-4 py-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                            <Settings2 className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">Advanced Settings</span>
+                        </div>
+                        <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="w-9 p-0">
+                                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isAdvancedOpen ? "rotate-180" : ""}`} />
+                                <span className="sr-only">Toggle</span>
+                            </Button>
+                        </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent className="space-y-2">
+                        <Card>
+                            <CardContent className="pt-6 space-y-6">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <Label>Chunk Size</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Characters per chunk (default: 1000)
+                                            </p>
+                                        </div>
+                                        <span className="text-sm font-medium tabular-nums">
+                                            {chunkSize[0]}
+                                        </span>
+                                    </div>
+                                    <Slider
+                                        value={chunkSize}
+                                        onValueChange={setChunkSize}
+                                        min={100}
+                                        max={4000}
+                                        step={100}
+                                    />
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <Label>Chunk Overlap</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Overlap between chunks (default: 200)
+                                            </p>
+                                        </div>
+                                        <span className="text-sm font-medium tabular-nums">
+                                            {chunkOverlap[0]}
+                                        </span>
+                                    </div>
+                                    <Slider
+                                        value={chunkOverlap}
+                                        onValueChange={setChunkOverlap}
+                                        min={0}
+                                        max={1000}
+                                        step={50}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </CollapsibleContent>
+                </Collapsible>
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
                 <Tabs defaultValue="text" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         {/* <TabsTrigger value="files" className="flex items-center gap-2">
@@ -568,7 +642,7 @@ export default function UploadPage() {
                         <Card>
                             <CardContent className="pt-6">
                                 <TextInputUpload
-                                    onUpload={handleTextUpload}
+                                    onUpload={(title, content) => handleTextUpload(title, content, { chunkSize: chunkSize[0], chunkOverlap: chunkOverlap[0] })}
                                     disabled={!hasTargetsSelected || isUploading}
                                 />
                             </CardContent>
@@ -578,7 +652,7 @@ export default function UploadPage() {
                         <Card>
                             <CardContent className="pt-6">
                                 <ScrapeUpload
-                                    onUpload={handleScrapeUpload}
+                                    onUpload={(docs) => handleScrapeUpload(docs, { chunkSize: chunkSize[0], chunkOverlap: chunkOverlap[0] })}
                                     disabled={!hasTargetsSelected || isUploading}
                                 />
                             </CardContent>
