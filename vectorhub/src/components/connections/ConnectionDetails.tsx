@@ -59,11 +59,13 @@ interface ConnectionDetailsProps {
 
 interface CollectionInfo {
     name: string;
+    description?: string;
     documentCount: number;
     dimensions?: number;
     indexType?: string;
     size?: string;
     lastModified?: Date;
+    isTool?: boolean;
 }
 
 interface ConnectionStats {
@@ -83,34 +85,36 @@ async function fetchConnectionDetails(connection: ConnectionConfig): Promise<{
 }> {
     let fetchedCollections: CollectionInfo[] = [];
     
-    // Only fetch collections for database connection types
-    const databaseTypes = ["mongodb_atlas", "supabase", "pinecone", "weaviate", "qdrant", "chromadb", "milvus", "redis", "upstash", "neo4j", "elasticsearch", "pgvector"];
+    // Connection types that should fetch from API
+    const apiTypes = ["mongodb_atlas", "supabase", "pinecone", "weaviate", "qdrant", "chromadb", "milvus", "redis", "upstash", "neo4j", "elasticsearch", "pgvector", "mcp"];
     
-    if (databaseTypes.includes(connection.type)) {
+    if (apiTypes.includes(connection.type)) {
         try {
             const apiCollections = await listCollectionsApi(connection);
-            fetchedCollections = apiCollections.map((col) => ({
+            fetchedCollections = apiCollections.map((col: any) => ({
                 name: col.name,
+                description: col.description,
                 documentCount: col.documentCount || 0,
                 dimensions: col.dimensions,
-                indexType: col.distanceMetric === "cosine" ? "HNSW" : "IVF_FLAT",
-                size: `${((col.documentCount || 0) * 0.05).toFixed(1)} MB`,
+                indexType: col.isTool ? "MCP Tool" : (col.distanceMetric === "cosine" ? "HNSW" : col.distanceMetric || "IVF_FLAT"),
+                size: col.isTool ? "N/A" : `${((col.documentCount || 0) * 0.05).toFixed(1)} MB`,
                 lastModified: new Date(),
+                isTool: col.isTool,
             }));
         } catch (error) {
             console.error("Failed to fetch collections:", error);
+            // Fallback for MCP if API fails
+            if (connection.type === "mcp") {
+                fetchedCollections = [{
+                    name: "Failed to fetch MCP tools",
+                    documentCount: 0,
+                    dimensions: 0,
+                    indexType: "Error",
+                    size: "N/A",
+                    lastModified: new Date(),
+                }];
+            }
         }
-    } else if (connection.type === "mcp") {
-        // For MCP connections, show tools as "collections"
-        const config = connection.config as Record<string, unknown>;
-        fetchedCollections = [{
-            name: "MCP Tools",
-            documentCount: 0,
-            dimensions: 0,
-            indexType: "MCP",
-            size: "N/A",
-            lastModified: new Date(),
-        }];
     } else if (connection.type === "webhook") {
         // For Webhook connections, show endpoint info
         fetchedCollections = [{
@@ -437,16 +441,34 @@ export function ConnectionDetails({
                                                     >
                                                         <div className="flex items-start justify-between">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                                                    <Database className="h-5 w-5 text-primary" />
+                                                                <div className={cn(
+                                                                    "h-10 w-10 rounded-lg flex items-center justify-center",
+                                                                    collection.isTool ? "bg-amber-500/10" : "bg-primary/10"
+                                                                )}>
+                                                                    {collection.isTool ? (
+                                                                        <Zap className="h-5 w-5 text-amber-500" />
+                                                                    ) : (
+                                                                        <Database className="h-5 w-5 text-primary" />
+                                                                    )}
                                                                 </div>
                                                                 <div>
                                                                     <p className="font-medium">{collection.name}</p>
+                                                                    {collection.description && (
+                                                                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                                                            {collection.description}
+                                                                        </p>
+                                                                    )}
                                                                     <div className="flex items-center gap-2 mt-1">
-                                                                        <Badge variant="secondary" className="text-xs">
-                                                                            {collection.documentCount.toLocaleString()} docs
-                                                                        </Badge>
-                                                                        {collection.dimensions && (
+                                                                        {collection.isTool ? (
+                                                                            <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-600">
+                                                                                MCP Tool
+                                                                            </Badge>
+                                                                        ) : (
+                                                                            <Badge variant="secondary" className="text-xs">
+                                                                                {collection.documentCount.toLocaleString()} docs
+                                                                            </Badge>
+                                                                        )}
+                                                                        {collection.dimensions && collection.dimensions > 0 && (
                                                                             <Badge variant="outline" className="text-xs">
                                                                                 {collection.dimensions}d
                                                                             </Badge>
@@ -455,7 +477,9 @@ export function ConnectionDetails({
                                                                 </div>
                                                             </div>
                                                             <div className="text-right">
-                                                                <p className="text-sm font-medium">{collection.size}</p>
+                                                                {!collection.isTool && (
+                                                                    <p className="text-sm font-medium">{collection.size}</p>
+                                                                )}
                                                                 {collection.indexType && (
                                                                     <p className="text-xs text-muted-foreground">
                                                                         {collection.indexType}
@@ -463,7 +487,7 @@ export function ConnectionDetails({
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        {collection.lastModified && (
+                                                        {collection.lastModified && !collection.isTool && (
                                                             <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
                                                                 <span>Last modified</span>
                                                                 <span>

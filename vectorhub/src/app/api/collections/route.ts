@@ -1,12 +1,121 @@
 import { NextResponse } from "next/server";
 import { MongoClient } from "mongodb";
-import { ConnectionConfig, MongoDBAtlasConfig } from "@/types/connections";
+import { ConnectionConfig, MongoDBAtlasConfig, MCPConfig } from "@/types/connections";
 import {
     createCollectionSchema,
     validateRequestBody,
 } from "@/lib/validations/api";
 import type { CreateCollectionConfig, CollectionInfo } from "@/lib/db/adapters/base";
 import { logger } from "@/lib/logger";
+
+interface MCPTool {
+    name: string;
+    description?: string;
+    inputSchema?: Record<string, unknown>;
+}
+
+// Fetch MCP tools from an MCP server
+async function listMCPTools(config: MCPConfig): Promise<{ tools: MCPTool[]; error?: string }> {
+    // Extract the HTTP endpoint from config
+    let endpoint: string | undefined;
+    
+    // Check various URL fields
+    if (config.url) endpoint = config.url;
+    else if (config.webhookUrl) endpoint = config.webhookUrl;
+    
+    // Extract from supergateway args if present
+    if (!endpoint && config.args && Array.isArray(config.args)) {
+        const streamableIndex = config.args.findIndex((arg: string) => 
+            arg === "--streamableHttp" || arg === "--sse"
+        );
+        if (streamableIndex !== -1 && config.args[streamableIndex + 1]) {
+            endpoint = config.args[streamableIndex + 1];
+        }
+        // Also check for URLs directly in args
+        if (!endpoint) {
+            const urlArg = config.args.find((arg: string) => 
+                arg.startsWith("http://") || arg.startsWith("https://")
+            );
+            if (urlArg) endpoint = urlArg;
+        }
+    }
+    
+    if (!endpoint) {
+        logger.warn("No MCP endpoint found in config");
+        return { tools: [], error: "No endpoint configured" };
+    }
+    
+    // Extract auth header if present
+    let authHeader: string | undefined;
+    if ((config as any).authToken) {
+        authHeader = (config as any).authToken;
+    } else if (config.args && Array.isArray(config.args)) {
+        const headerIndex = config.args.findIndex((arg: string) => arg === "--header");
+        if (headerIndex !== -1 && config.args[headerIndex + 1]) {
+            const headerValue = config.args[headerIndex + 1];
+            if (headerValue.toLowerCase().startsWith("authorization:")) {
+                authHeader = headerValue.split(":").slice(1).join(":").trim();
+            }
+        }
+    }
+    
+    try {
+        logger.info(`Fetching MCP tools from: ${endpoint}`);
+        
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        };
+        
+        if (authHeader) {
+            headers["Authorization"] = authHeader.startsWith("Bearer ") 
+                ? authHeader 
+                : `Bearer ${authHeader}`;
+        }
+        
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: Date.now(),
+                method: "tools/list",
+                params: {},
+            }),
+        });
+        
+        const text = await response.text();
+        
+        // Parse SSE or JSON response
+        let data;
+        if (text.includes("data: ")) {
+            const lines = text.split("\n");
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    try {
+                        data = JSON.parse(line.slice(6));
+                        break;
+                    } catch {
+                        continue;
+                    }
+                }
+            }
+        } else {
+            data = JSON.parse(text);
+        }
+        
+        if (data?.result?.tools) {
+            logger.info(`Found ${data.result.tools.length} MCP tools`);
+            return { tools: data.result.tools };
+        }
+        
+        return { tools: [], error: "No tools found in response" };
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : "Unknown error";
+        logger.error(`Failed to fetch MCP tools: ${errorMsg}`);
+        return { tools: [], error: errorMsg };
+    }
+}
 
 async function createMongoDBCollection(config: MongoDBAtlasConfig, collectionConfig: CreateCollectionConfig): Promise<CollectionInfo> {
     const client = new MongoClient(config.connectionString);
@@ -111,10 +220,26 @@ export async function GET(request: Request) {
             return NextResponse.json(collections);
         }
 
-        // MCP connections don't have traditional collections
+        // MCP connections - fetch actual tools from the server
         if (connectionConfig.type === "mcp") {
+            const mcpConfig = connectionConfig.config as MCPConfig;
+            const { tools, error } = await listMCPTools(mcpConfig);
+            
+            if (tools.length > 0) {
+                // Return each tool as a "collection" with its description
+                return NextResponse.json(tools.map(tool => ({
+                    name: tool.name,
+                    description: tool.description || "MCP Tool",
+                    documentCount: 0,
+                    dimensions: 0,
+                    distanceMetric: "MCP",
+                    isTool: true,
+                })));
+            }
+            
+            // Fallback if no tools found
             return NextResponse.json([{
-                name: "MCP Tools",
+                name: error ? `Error: ${error}` : "No MCP Tools found",
                 documentCount: 0,
                 dimensions: 0,
                 distanceMetric: "N/A",
