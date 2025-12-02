@@ -48,7 +48,8 @@ export interface AIAgent {
 interface RAGChatProps {
     onSendMessage: (
         message: string,
-        agent: AIAgent | null
+        agent: AIAgent | null,
+        history: Message[]
     ) => Promise<{ response: string; context: SearchResult[] }>;
     agents: AIAgent[];
     selectedAgent: AIAgent | null;
@@ -251,6 +252,9 @@ export function RAGChat({
             agentUsed: selectedAgent?.name || "Vector Search",
         };
 
+        // Create a new history array including the current user message
+        const currentHistory = [...messages, userMessage];
+
         setMessages((prev) => [...prev, userMessage, loadingMessage]);
         setInput("");
         setIsLoading(true);
@@ -258,7 +262,9 @@ export function RAGChat({
         try {
             const { response, context } = await onSendMessage(
                 input.trim(),
-                selectedAgent
+                selectedAgent,
+                messages // Pass existing history (excluding current message as it's passed as query, or include it? Usually history excludes current query)
+                // Actually, let's pass the *previous* messages as history. The current query is passed separately.
             );
 
             setMessages((prev) =>

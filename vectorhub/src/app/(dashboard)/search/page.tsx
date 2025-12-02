@@ -186,7 +186,8 @@ export default function SearchPage() {
     const handleSendMessage = useCallback(
         async (
             message: string,
-            agent: AIAgent | null
+            agent: AIAgent | null,
+            history: any[] // Using any[] for now to avoid importing Message type circular dependency, or define it here
         ): Promise<{ response: string; context: SearchResult[] }> => {
             try {
                 const response = await fetch("/api/rag", {
@@ -197,6 +198,10 @@ export default function SearchPage() {
                         collection: selectedCollection || undefined,
                         topK: topK[0],
                         minScore: minScore[0],
+                        history: history.map(msg => ({
+                            role: msg.role,
+                            content: msg.content
+                        })),
                         agent: agent
                             ? {
                                 type: agent.type,

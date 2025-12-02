@@ -8,6 +8,7 @@ interface RAGRequest {
     collection?: string;
     topK?: number;
     minScore?: number;
+    history?: { role: string; content: string }[];
     agent?: {
         type: "mcp" | "webhook" | "mock";
         endpoint?: string;
@@ -171,7 +172,8 @@ async function callHttpAgent(
     query: string,
     context: SearchResult[],
     agentName: string,
-    authHeader?: string
+    authHeader?: string,
+    history?: { role: string; content: string }[]
 ): Promise<string> {
     logger.info(`Calling HTTP agent: ${agentName} at ${url}`);
 
@@ -257,6 +259,7 @@ async function callHttpAgent(
                         message: query,
                         query: query,
                         input: query,
+                        history: history, // Pass history to n8n workflow
                         context: context.length > 0 ? context.map(c => c.content).join("\n\n") : undefined,
                     },
                 },
@@ -330,6 +333,7 @@ Error: ${errorMsg}${helpfulHint}
             input: query,
             prompt: query,
             question: query,
+            history: history, // Pass history to MCP tool
         };
 
         if (context.length > 0) {
@@ -374,6 +378,7 @@ Error: ${errorMsg}${helpfulHint}
         body: JSON.stringify({
             query,
             message: query,
+            history: history, // Pass history to webhook
             context: context.map((c) => ({
                 content: c.content || "",
                 score: c.score,
