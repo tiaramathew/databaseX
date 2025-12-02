@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mockDbClient } from "@/lib/db/client";
+import { dbClient } from "@/lib/db/client";
 import { logger } from "@/lib/logger";
 import type { SearchResult } from "@/lib/db/adapters/base";
 
@@ -526,7 +526,7 @@ export async function POST(request: Request) {
 
         if (collection) {
             try {
-                context = await mockDbClient.search(collection, {
+                context = await dbClient.search(collection, {
                     text: query,
                     topK,
                     minScore,

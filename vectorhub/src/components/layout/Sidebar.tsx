@@ -42,7 +42,12 @@ const bottomNavItems = [
     { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
-export function Sidebar() {
+interface SidebarContentProps {
+    className?: string;
+    onNavigate?: () => void;
+}
+
+export function SidebarContent({ className, onNavigate }: SidebarContentProps) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const user = session?.user;
@@ -58,10 +63,10 @@ export function Sidebar() {
     }
 
     return (
-        <div className="flex h-full w-64 flex-col border-r bg-card/50 backdrop-blur-sm">
+        <div className={cn("flex h-full w-64 flex-col border-r bg-card/50 backdrop-blur-sm", className)}>
             {/* Logo */}
             <div className="flex h-14 items-center border-b px-4">
-                <Link href="/" className="flex items-center gap-2 group">
+                <Link href="/" className="flex items-center gap-2 group" onClick={onNavigate}>
                     <div className="relative">
                         <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
                             <Zap className="h-4 w-4 text-primary-foreground" />
@@ -84,7 +89,7 @@ export function Sidebar() {
                 {displayedNavItems.map((item) => {
                     const active = isActive(item.href);
                     return (
-                        <Link key={item.href} href={item.href}>
+                        <Link key={item.href} href={item.href} onClick={onNavigate}>
                             <motion.div
                                 className={cn(
                                     "relative flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -127,7 +132,7 @@ export function Sidebar() {
                 {bottomNavItems.map((item) => {
                     const active = isActive(item.href);
                     return (
-                        <Link key={item.href} href={item.href}>
+                        <Link key={item.href} href={item.href} onClick={onNavigate}>
                             <motion.div
                                 className={cn(
                                     "relative flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -206,4 +211,8 @@ export function Sidebar() {
             </div>
         </div>
     );
+}
+
+export function Sidebar() {
+    return <SidebarContent className="hidden md:flex" />;
 }

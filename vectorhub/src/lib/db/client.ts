@@ -1,4 +1,3 @@
-import { MockAdapter } from "./adapters/mock-adapter";
 import { WebhookAdapter } from "./adapters/webhook-adapter";
 import { MCPAdapter } from "./adapters/mcp-adapter";
 import { MongoDBAdapter } from "./adapters/mongodb-adapter";
@@ -27,12 +26,12 @@ function createAdapter(type: VectorDBType): VectorDBAdapter {
         case "supabase":
             return new SupabaseAdapter();
         default:
-            return new MockAdapter();
+            throw new Error(`Unsupported adapter type: ${type}`);
     }
 }
 
 export class VectorDBClient {
-    private adapter: VectorDBAdapter;
+    private adapter: VectorDBAdapter | null = null;
     private connectionPromise: Promise<void> | null = null;
     private config: ConnectionConfig | null = null;
 
@@ -42,13 +41,14 @@ export class VectorDBClient {
             this.adapter = createAdapter(config.type);
             // Start connection - will be awaited in ensureConnected
             this.connectionPromise = this.adapter.connect(config);
-        } else {
-            this.adapter = new MockAdapter();
         }
     }
 
     // Ensure connection is established before operations
     private async ensureConnected(): Promise<void> {
+        if (!this.adapter) {
+            throw new Error("Database client not initialized. Please connect first.");
+        }
         if (this.connectionPromise) {
             await this.connectionPromise;
             this.connectionPromise = null;
@@ -64,68 +64,69 @@ export class VectorDBClient {
     }
 
     async disconnect(): Promise<void> {
-        await this.adapter.disconnect();
+        if (this.adapter) {
+            await this.adapter.disconnect();
+        }
     }
 
     getConnectionStatus() {
-        return this.adapter.getConnectionStatus();
+        return this.adapter?.getConnectionStatus() ?? { connected: false };
     }
 
     async testConnection() {
         await this.ensureConnected();
-        return this.adapter.testConnection();
+        return this.adapter!.testConnection();
     }
 
     async listDatabases(): Promise<DatabaseInfo[]> {
         await this.ensureConnected();
-        return this.adapter.listDatabases?.() ?? Promise.resolve([]);
+        return this.adapter!.listDatabases?.() ?? Promise.resolve([]);
     }
 
     async listCollections(): Promise<CollectionInfo[]> {
         await this.ensureConnected();
-        return this.adapter.listCollections();
+        return this.adapter!.listCollections();
     }
 
     async createCollection(config: CreateCollectionConfig): Promise<CollectionInfo> {
         await this.ensureConnected();
-        return this.adapter.createCollection(config);
+        return this.adapter!.createCollection(config);
     }
 
     async getCollection(name: string): Promise<CollectionInfo> {
         await this.ensureConnected();
-        return this.adapter.getCollection(name);
+        return this.adapter!.getCollection(name);
     }
 
     async updateCollection(name: string, updates: UpdateCollectionConfig): Promise<void> {
         await this.ensureConnected();
-        return this.adapter.updateCollection(name, updates);
+        return this.adapter!.updateCollection(name, updates);
     }
 
     async deleteCollection(name: string, cascade?: boolean): Promise<void> {
         await this.ensureConnected();
-        return this.adapter.deleteCollection(name, cascade);
+        return this.adapter!.deleteCollection(name, cascade);
     }
 
     async getCollectionStats(name: string): Promise<CollectionStats> {
         await this.ensureConnected();
-        return this.adapter.getCollectionStats(name);
+        return this.adapter!.getCollectionStats(name);
     }
 
     async addDocuments(collection: string, documents: VectorDocument[]): Promise<string[]> {
         await this.ensureConnected();
-        return this.adapter.addDocuments(collection, documents);
+        return this.adapter!.addDocuments(collection, documents);
     }
 
     async deleteDocuments(collection: string, ids: string[]): Promise<void> {
         await this.ensureConnected();
-        return this.adapter.deleteDocuments(collection, ids);
+        return this.adapter!.deleteDocuments(collection, ids);
     }
 
     async search(collection: string, query: SearchQuery): Promise<SearchResult[]> {
         await this.ensureConnected();
-        return this.adapter.search(collection, query);
+        return this.adapter!.search(collection, query);
     }
 }
 
 export const dbClient = new VectorDBClient();
-export const mockDbClient = dbClient;

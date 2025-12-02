@@ -265,10 +265,35 @@ function NotificationsDropdown() {
     );
 }
 
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { SidebarContent } from "@/components/layout/Sidebar";
+import { Menu } from "lucide-react";
+
+function MobileNav() {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden mr-2">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Toggle menu</span>
+                </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-64 border-r-0">
+                <SidebarContent onNavigate={() => setOpen(false)} className="w-full border-r-0" />
+            </SheetContent>
+        </Sheet>
+    );
+}
+
 export function Header() {
     return (
-        <header className="flex h-14 items-center justify-between border-b bg-card/50 backdrop-blur-sm px-6 sticky top-0 z-40">
-            <Breadcrumbs />
+        <header className="flex h-14 items-center justify-between border-b bg-card/50 backdrop-blur-sm px-4 md:px-6 sticky top-0 z-40">
+            <div className="flex items-center">
+                <MobileNav />
+                <Breadcrumbs />
+            </div>
             <div className="flex items-center space-x-2">
                 <Link href="/search">
                     <Button variant="ghost" size="icon" className="h-9 w-9">

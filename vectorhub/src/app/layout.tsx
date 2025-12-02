@@ -24,9 +24,24 @@ export const metadata: Metadata = {
         template: "%s | VectorHub",
     },
     description: "Universal Vector Database & Integration Manager - Manage, search, and analyze your vector databases with ease.",
-    keywords: ["vector database", "embeddings", "semantic search", "AI", "machine learning"],
+    keywords: ["vector database", "embeddings", "semantic search", "AI", "machine learning", "RAG", "LLM"],
     authors: [{ name: "VectorHub Team" }],
     creator: "VectorHub",
+    metadataBase: new URL("https://vectorhub.vercel.app"),
+    openGraph: {
+        type: "website",
+        locale: "en_US",
+        url: "https://vectorhub.vercel.app",
+        title: "VectorHub - Universal Vector Database Manager",
+        description: "Manage, search, and analyze your vector databases with ease. Connect to Pinecone, Weaviate, Qdrant, and more.",
+        siteName: "VectorHub",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "VectorHub - Universal Vector Database Manager",
+        description: "Manage, search, and analyze your vector databases with ease.",
+        creator: "@vectorhub",
+    },
 };
 
 export const viewport: Viewport = {

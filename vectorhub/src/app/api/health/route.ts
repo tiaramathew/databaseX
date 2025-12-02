@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mockDbClient } from "@/lib/db/client";
+import { dbClient } from "@/lib/db/client";
 
 interface HealthStatus {
     status: "healthy" | "degraded" | "unhealthy";
@@ -34,7 +34,7 @@ export async function GET() {
 
     try {
         // Test database connection
-        await mockDbClient.listCollections();
+        await dbClient.listCollections();
         const latency = Date.now() - dbStartTime;
 
         dbStatus = {
@@ -88,8 +88,8 @@ export async function GET() {
         overallStatus === "healthy"
             ? 200
             : overallStatus === "degraded"
-              ? 200
-              : 503;
+                ? 200
+                : 503;
 
     return NextResponse.json(health, { status: httpStatus });
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { MongoDBAtlasConfig } from "@/types/connections";
 import { logger } from "@/lib/logger";
 import { generateEmbedding } from "@/lib/embeddings";
-import { searchMongoDBVectors, searchMongoDBText } from "@/app/api/search/route";
+import { searchMongoDBVectors, searchMongoDBText } from "@/lib/db/mongodb-utils";
 import type { SearchQuery, SearchResult } from "@/lib/db/adapters/base";
 
 const EXPECTED_EMBEDDING_DIMENSIONS = 1536;
@@ -26,10 +26,10 @@ export async function POST(request: Request) {
 
         if (searchQuery.vector) {
             logger.info(`Received vector query via adapter. Dimensions: ${searchQuery.vector.length}, Expected: ${expectedDimensions}`);
-            
+
             if (searchQuery.vector.length !== expectedDimensions) {
                 logger.warn(`Vector dimension mismatch in adapter: received ${searchQuery.vector.length}, expected ${expectedDimensions}`);
-                
+
                 if (searchQuery.text && searchQuery.text.trim()) {
                     try {
                         const regeneratedVector = await generateEmbedding(searchQuery.text);

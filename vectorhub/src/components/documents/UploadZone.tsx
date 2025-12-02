@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useState } from "react";
@@ -123,13 +122,14 @@ export function UploadZone({ onUpload, disabled }: UploadZoneProps) {
                     >
                         {files.map((file, i) => (
                             <motion.div
-                                key={`${ file.name } -${ i } `}
+                                key={`${file.name}-${i}`}
                                 className="flex items-center justify-between rounded-lg border bg-card p-3"
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 20 }}
                                 transition={{ delay: i * 0.05 }}
                             >
+                                <div className="flex items-center gap-3">
                                     <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
                                         <FileIcon className="h-4 w-4 text-muted-foreground" />
                                     </div>
@@ -158,20 +158,19 @@ export function UploadZone({ onUpload, disabled }: UploadZoneProps) {
                                     </Button>
                                 </div>
                             </motion.div>
-                ))}
-                <div className="flex justify-end pt-2">
-                    <Button onClick={handleUpload} disabled={disabled || isUploading}>
-                        {isUploading ? (
-                            <>Uploading...</>
-                        ) : (
-                            <>Upload {files.length} File{files.length !== 1 ? "s" : ""}</>
-                        )}
-                    </Button>
-                </div>
-            </motion.div>
+                        ))}
+                        <div className="flex justify-end pt-2">
+                            <Button onClick={handleUpload} disabled={disabled || isUploading}>
+                                {isUploading ? (
+                                    <>Uploading...</>
+                                ) : (
+                                    <>Upload {files.length} File{files.length !== 1 ? "s" : ""}</>
+                                )}
+                            </Button>
+                        </div>
+                    </motion.div>
                 )}
-        </AnimatePresence>
-        </div >
+            </AnimatePresence>
+        </div>
     );
 }
-```
