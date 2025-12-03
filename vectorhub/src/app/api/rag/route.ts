@@ -33,12 +33,30 @@ interface RAGResponse {
 }
 
 // Generate an AI-like response based on query and context
-function generateResponse(query: string, context: SearchResult[], agentName?: string): string {
+function generateResponse(
+    query: string,
+    context: SearchResult[],
+    agentName?: string,
+    history?: { role: string; content: string }[]
+): string {
     const queryLower = query.toLowerCase();
+    const name = agentName || "Vector Search";
+
+    // Simple history-aware context check
+    let historyContext = "";
+    if (history && history.length > 0) {
+        const lastUserMessage = [...history].reverse().find(h => h.role === "user");
+        if (lastUserMessage) {
+            // Very basic context awareness
+            if (queryLower.includes("previous") || queryLower.includes("last") || queryLower.includes("that")) {
+                historyContext = `(Continuing from your previous question: "${lastUserMessage.content.substring(0, 50)}...")\n\n`;
+            }
+        }
+    }
 
     // Handle common conversational queries
     if (queryLower.includes("who are you") || queryLower.includes("what are you")) {
-        return `I'm the RAG Assistant for VectorHub! I help you search through your vector database and retrieve relevant information from your uploaded documents.
+        return `${historyContext}I'm the RAG Assistant for VectorHub! I help you search through your vector database and retrieve relevant information from your uploaded documents.
 
 **My capabilities:**
 - Search your vector database for relevant documents
@@ -47,19 +65,19 @@ function generateResponse(query: string, context: SearchResult[], agentName?: st
 
 ${context.length > 0 ? `\nI found ${context.length} document(s) that might be relevant to your question.` : "\nNo documents are currently loaded. Upload some documents to get started!"}
 
-*${agentName || "Vector Search"}*`;
+*${name}*`;
     }
 
     if (queryLower.includes("where are you from") || queryLower.includes("where do you come from")) {
-        return `I'm a RAG (Retrieval-Augmented Generation) assistant built into VectorHub. I run locally in your browser and connect to your configured vector databases and AI services.
+        return `${historyContext}I'm a RAG (Retrieval-Augmented Generation) assistant built into VectorHub. I run locally in your browser and connect to your configured vector databases and AI services.
 
 ${context.length > 0 ? `I'm currently searching through ${context.length} relevant document(s) from your database.` : "I don't have any documents loaded yet - upload some to start exploring!"}
 
-*${agentName || "Vector Search"}*`;
+*${name}*`;
     }
 
     if (queryLower.includes("hello") || queryLower.includes("hi") || queryLower.includes("hey")) {
-        return `Hello! 👋 I'm your RAG Assistant. I can help you search through your documents and find relevant information.
+        return `${historyContext}Hello! 👋 I'm your RAG Assistant. I can help you search through your documents and find relevant information.
 
 **Try asking me:**
 - Questions about your uploaded documents
@@ -68,11 +86,11 @@ ${context.length > 0 ? `I'm currently searching through ${context.length} releva
 
 ${context.length > 0 ? `\nI found ${context.length} potentially relevant document(s).` : "\n📝 Upload some documents first to unlock my full potential!"}
 
-*${agentName || "Vector Search"}*`;
+*${name}*`;
     }
 
     if (queryLower.includes("help") || queryLower.includes("what can you do")) {
-        return `**Here's what I can do:**
+        return `${historyContext}**Here's what I can do:**
 
 1. **Search Documents** - Find relevant passages from your uploaded files
 2. **Semantic Search** - Understand meaning, not just keywords
@@ -85,7 +103,7 @@ ${context.length > 0 ? `\nI found ${context.length} potentially relevant documen
 
 ${context.length > 0 ? `\n✅ Found ${context.length} document(s) matching your query.` : "\n⚠️ No documents found. Upload some files to search through!"}
 
-*${agentName || "Vector Search"}*`;
+*${name}*`;
     }
 
     // If we have context, provide a more intelligent response
@@ -103,7 +121,7 @@ ${context.length > 0 ? `\n✅ Found ${context.length} document(s) matching your 
             })
             .join("\n\n");
 
-        return `Based on your question "${query}", I found ${context.length} relevant document(s):
+        return `${historyContext}Based on your question "${query}", I found ${context.length} relevant document(s):
 
 ${contextSummary}
 
@@ -112,11 +130,11 @@ ${contextSummary}
 
 💡 **Tip:** Connect an AI agent (MCP/Webhook) in the Connections page for more intelligent, conversational responses!
 
-*${agentName || "Vector Search"}*`;
+*${name}*`;
     }
 
     // No context - general response
-    return `I received your question: "${query}"
+    return `${historyContext}I received your question: "${query}"
 
 However, I don't have any documents to search through yet, or no documents matched your query.
 
@@ -126,7 +144,7 @@ However, I don't have any documents to search through yet, or no documents match
 3. 🔧 Lower the "Min similarity score" to find more results
 4. 🤖 Connect an AI agent (n8n, Make.com) for intelligent responses
 
-*${agentName || "Vector Search"}*`;
+*${name}*`;
 }
 
 // Make MCP JSON-RPC request
@@ -417,7 +435,8 @@ Error: ${errorMsg}${helpfulHint}
 // Handle local built-in agent requests
 async function handleLocalAgent(
     query: string,
-    context: SearchResult[]
+    context: SearchResult[],
+    history?: { role: string; content: string }[]
 ): Promise<string> {
     const queryLower = query.toLowerCase();
 
@@ -451,7 +470,7 @@ async function handleLocalAgent(
     }
 
     // Default RAG response if no tools matched
-    return generateResponse(query, context, "VectorHub Assistant");
+    return generateResponse(query, context, "VectorHub Assistant", history);
 }
 
 // Extract HTTP URL from config (handles supergateway and other patterns)
@@ -514,7 +533,7 @@ function extractAuthHeader(agent: RAGRequest["agent"]): string | undefined {
 export async function POST(request: Request) {
     try {
         const body: RAGRequest = await request.json();
-        const { query, collection, topK = 5, minScore = 0.5, agent } = body;
+        const { query, collection, topK = 5, minScore = 0.5, agent, history } = body;
 
         if (!query) {
             return NextResponse.json(
@@ -556,7 +575,7 @@ export async function POST(request: Request) {
 
         if (!agent || agent.type === "mock") {
             // Use built-in response generator
-            response = generateResponse(query, context, "Vector Search");
+            response = generateResponse(query, context, "Vector Search", history);
             agentUsed = "Vector Search";
         } else {
             // Extract endpoint and auth from agent config
@@ -565,7 +584,7 @@ export async function POST(request: Request) {
 
             if (agent.endpoint === "local") {
                 // Handle built-in local agent
-                response = await handleLocalAgent(query, context);
+                response = await handleLocalAgent(query, context, history);
                 agentUsed = "VectorHub Assistant";
             } else if (endpoint) {
                 try {
@@ -575,13 +594,13 @@ export async function POST(request: Request) {
                 } catch (err) {
                     const errorMsg = err instanceof Error ? err.message : "Unknown error";
                     logger.error(`Agent call failed (${agent.type}): ${errorMsg}`);
-                    response = generateResponse(query, context, agentName);
+                    response = generateResponse(query, context, agentName, history);
                     response += `\n\n⚠️ *Could not reach ${agentName}.*\n*Error: ${errorMsg}*`;
                     agentUsed = `${agentName} (fallback)`;
                 }
             } else {
                 // No endpoint - use vector search only
-                response = generateResponse(query, context, "Vector Search");
+                response = generateResponse(query, context, "Vector Search", history);
                 response += `\n\n💡 *No HTTP endpoint configured for ${agentName}. Please add a webhook URL in the connection settings.*`;
                 agentUsed = "Vector Search";
             }
